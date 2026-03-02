@@ -1,0 +1,15 @@
+module.exports = {
+  clubName: process.env.CLUB_NAME || "Padel Club Marseglia",
+  clubShortName: process.env.CLUB_SHORT_NAME || "PC",
+  clubEmail: process.env.CLUB_EMAIL || "",
+  clubPhone: process.env.CLUB_PHONE || "",
+  clubAddress: process.env.CLUB_ADDRESS || "",
+  clubLogoUrl: process.env.CLUB_LOGO_URL || "",
+  currency: process.env.CLUB_CURRENCY || "€",
+  slotPrice: parseInt(process.env.CLUB_SLOT_PRICE) || 40,
+  slotDuration: parseInt(process.env.CLUB_SLOT_DURATION) || 90,
+  openHour: parseInt(process.env.CLUB_OPEN_HOUR) || 8,
+  closeHour: parseInt(process.env.CLUB_CLOSE_HOUR) || 22,
+  courts: (process.env.CLUB_COURTS || "Campo 1,Campo 2,Campo 3").split(","),
+  appUrl: process.env.APP_URL || "http://localhost:5173",
+};

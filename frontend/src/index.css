@@ -1,0 +1,7 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+body { 
+  @apply bg-gradient-to-br from-emerald-50 to-teal-100 min-h-screen font-sans; 
+}
