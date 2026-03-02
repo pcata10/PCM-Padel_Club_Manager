@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import NavBar from "../components/NavBar";
 import CourtTimeline from "../components/CourtTimeline";
+import SponsorFooter from "../components/SponsorFooter";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
@@ -55,6 +56,33 @@ export default function AdminDashboard() {
   const [slotStart, setSlotStart] = useState("09:00");
   const [blockStart, setBlockStart] = useState("09:00");
   const [blockEnd, setBlockEnd] = useState("11:00");
+  // ── SPONSOR ────────────────────────────────────────────────────────
+  const [sponsors, setSponsors] = useState([]);
+  const [sponsorForm, setSponsorForm] = useState({
+    name: "",
+    logoUrl: "",
+    linkUrl: "",
+    order: 0,
+  });
+
+  const fetchSponsors = async () => {
+    const res = await api.get("/api/sponsors");
+    setSponsors(res.data);
+  };
+
+  const addSponsor = async () => {
+    if (!sponsorForm.name || !sponsorForm.logoUrl)
+      return alert("Nome e Logo obbligatori");
+    await api.post("/api/sponsors", sponsorForm);
+    setSponsorForm({ name: "", logoUrl: "", linkUrl: "", order: 0 });
+    fetchSponsors();
+  };
+
+  const deleteSponsor = async (id) => {
+    if (!window.confirm("Rimuovere sponsor?")) return;
+    await api.delete(`/api/sponsors/${id}`);
+    fetchSponsors();
+  };
 
   useEffect(() => {
     fetchData();
@@ -110,6 +138,7 @@ export default function AdminDashboard() {
       const cancelledRes = await api.get("/api/admin/bookings/cancelled");
       setCancelledBookings(cancelledRes.data);
     } catch {}
+    fetchSponsors();
   };
 
   const handleStatusClick = (court, status) => {
@@ -765,6 +794,77 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+      {/* ── GESTIONE SPONSOR ── */}
+      <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
+          🏷️ Sponsor
+        </h2>
+
+        {/* Form aggiunta */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+          <input
+            placeholder="Nome sponsor *"
+            value={sponsorForm.name}
+            onChange={(e) =>
+              setSponsorForm({ ...sponsorForm, name: e.target.value })
+            }
+            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+          />
+          <input
+            placeholder="URL Logo (https://...) *"
+            value={sponsorForm.logoUrl}
+            onChange={(e) =>
+              setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })
+            }
+            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+          />
+          <input
+            placeholder="URL sito sponsor"
+            value={sponsorForm.linkUrl}
+            onChange={(e) =>
+              setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })
+            }
+            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+          />
+          <button
+            onClick={addSponsor}
+            className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600"
+          >
+            ➕ Aggiungi
+          </button>
+        </div>
+
+        {/* Lista sponsor */}
+        <div className="flex flex-wrap gap-4">
+          {sponsors.map((s) => (
+            <div
+              key={s._id}
+              className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border"
+            >
+              <img
+                src={s.logoUrl}
+                alt={s.name}
+                className="h-8 object-contain"
+              />
+              <span className="font-semibold text-gray-700 text-sm">
+                {s.name}
+              </span>
+              <button
+                onClick={() => deleteSponsor(s._id)}
+                className="text-red-400 hover:text-red-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {sponsors.length === 0 && (
+            <p className="text-gray-400 text-sm">Nessuno sponsor aggiunto</p>
+          )}
+        </div>
+      </div>
+
+      <SponsorFooter />
+
       {/* ── MODAL ── */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">

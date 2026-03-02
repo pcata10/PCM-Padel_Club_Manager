@@ -59,7 +59,11 @@ async function sendBookingNotification({ player, court, booking, organizer }) {
 const app = express();
 app.use(
   cors({
-    origin: ["https://pc-padel-project.vercel.app", "http://localhost:5173"],
+    origin: [
+      "https://pc-padel-project.vercel.app",
+      "http://localhost:5173",
+      "http://192.168.178.142:5173",
+    ],
     credentials: true,
   }),
 );
@@ -689,6 +693,40 @@ app.post("/api/tournaments/:id/pair", auth, async (req, res) => {
   tournament.status = "running";
   await tournament.save();
   res.json({ matches });
+});
+const Sponsor = require("./models/Sponsor");
+
+// Pubblico — visibile a tutti
+app.get("/api/sponsors", async (req, res) => {
+  res.json(await Sponsor.find({ active: true }).sort({ order: 1 }));
+});
+
+// Admin only
+app.post("/api/sponsors", auth, async (req, res) => {
+  const player = await Player.findById(req.user.id);
+  if (player.role !== "admin")
+    return res.status(403).json({ msg: "Admin only" });
+  const sponsor = new Sponsor(req.body);
+  await sponsor.save();
+  res.json(sponsor);
+});
+
+app.put("/api/sponsors/:id", auth, async (req, res) => {
+  const player = await Player.findById(req.user.id);
+  if (player.role !== "admin")
+    return res.status(403).json({ msg: "Admin only" });
+  const sponsor = await Sponsor.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+  });
+  res.json(sponsor);
+});
+
+app.delete("/api/sponsors/:id", auth, async (req, res) => {
+  const player = await Player.findById(req.user.id);
+  if (player.role !== "admin")
+    return res.status(403).json({ msg: "Admin only" });
+  await Sponsor.findByIdAndDelete(req.params.id);
+  res.json({ msg: "Sponsor rimosso" });
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`Server on port ${PORT}`));

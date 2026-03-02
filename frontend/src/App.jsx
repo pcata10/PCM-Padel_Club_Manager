@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useConfig } from "./hooks/useConfig";
+import SponsorFooter from "./components/SponsorFooter";
 
 const getRole = () => {
   try {
@@ -45,6 +46,8 @@ function App() {
         >
           Inizia ora →
         </Link>
+
+        <SponsorFooter />
       </div>
     </div>
   );
