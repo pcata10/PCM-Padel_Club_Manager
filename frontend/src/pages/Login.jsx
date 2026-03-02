@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { useConfig } from "../hooks/useConfig";
+import SponsorFooter from "../components/SponsorFooter";
 
 const getRole = () => {
   try {
@@ -105,6 +106,7 @@ export default function Login() {
             Registrati
           </Link>
         </p>
+        <SponsorFooter />
       </div>
     </div>
   );
