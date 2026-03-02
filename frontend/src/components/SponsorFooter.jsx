@@ -14,8 +14,8 @@ export default function SponsorFooter() {
   if (sponsors.length === 0) return null;
 
   return (
-    <footer className="w-full mt-8 py-4 px-6 bg-gray-10000">
-      <p className="text-center text-xs text-gray-800 mb-3 uppercase tracking-widest">
+    <footer className="mt-8 py-4 px-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200">
+      <p className="text-center text-xs text-gray-400 mb-3 uppercase tracking-widest">
         I nostri sponsor
       </p>
       <div className="flex flex-wrap justify-center items-center gap-6">

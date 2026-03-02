@@ -25,7 +25,7 @@ export default function NavBar() {
   };
 
   return (
-    <nav className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-800 shadow-lg sticky top-0 z-40 w-full">
+    <nav className="bg-gradient-to-r from-blue-700 to-blue-950 shadow-lg sticky top-0 z-40 w-full">
       <div className="w-full px-4 md:max-w-6xl md:mx-auto md:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Logo */}

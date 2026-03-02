@@ -108,19 +108,19 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-400">
         <div className="text-xl text-emerald-600">Caricando dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br">
       <NavBar />
-      <div className="pt-20 px-4 md:px-8 max-w-6xl mx-auto space-y-8 pb-12">
+      <div className="pt-10 px-4 md:px-8 max-w-6xl mx-auto space-y-8 pb-12">
         {/* ── HEADER ── */}
-        <h1 className="text-3xl md:text-5xl font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 bg-clip-text text-transparent">
-          Dashboard Padel
+        <h1 className="text-3xl text-center md:text-5xl font-black bg-gradient-to-r from-blue-700 to-blue-950 bg-clip-text text-transparent">
+          Dashboard Utente
         </h1>
 
         {/* ── LE TUE PRENOTAZIONI ── */}
@@ -304,7 +304,7 @@ export default function Dashboard() {
                       key={court._id}
                       className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
                     >
-                      <div className="px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-between">
+                      <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
                         <span className="font-bold text-white text-base">
                           {court.name}
                         </span>

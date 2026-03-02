@@ -170,7 +170,7 @@ export default function Book() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50">
       <NavBar />
-      <div className="max-w-lg mx-auto px-4 pt-20 pb-10 space-y-5">
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-10 space-y-6">
         {/* ── TITOLO ── */}
         <div className="text-center pt-2">
           <h1 className="text-3xl font-black bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -180,10 +180,10 @@ export default function Book() {
         </div>
 
         {/* ── SELETTORE DATA ── */}
-        <div className="bg-white/90 rounded-3xl shadow-lg p-4">
-          <label className="block text-sm font-bold text-gray-700 mb-2">
-            📅 Giorno
-          </label>
+        <div
+          className="
+          text-center flex justify-center mb-4 gap-2"
+        >
           <input
             type="date"
             value={selectedDate}
@@ -194,10 +194,23 @@ export default function Book() {
             min={minDate}
             max={maxDate}
             className="w-full max-w-full p-3 border-2 border-gray-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-blue-300 focus:border-blue-500 box-border"
-            style={{ WebkitAppearance: "none", appearance: "none" }}
+            style={{
+              WebkitAppearance: "none",
+              appearance: "none",
+              maxWidth: "40%",
+              boxSizing: "border-box",
+              backgroundColor: "lightyellow",
+              borderColor: "goldenrod",
+            }}
           />
         </div>
 
+        <label className="block text-sm font-bold text-gray-700 mb-2 text-center ">
+          ⬆️ <br></br>Seleziona un giorno <br></br>
+          <br></br>
+          <hr></hr>
+          <br></br> Seleziona uno slot libero<br></br> ⬇️
+        </label>
         {/* ── GRIGLIA DISPONIBILITÀ ── */}
         {[...courts]
           .filter((c) => c.status === "available")
@@ -212,7 +225,7 @@ export default function Book() {
                 key={court._id}
                 className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
               >
-                <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between">
+                <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
                   <span className="font-bold text-white text-base">
                     {court.name}
                   </span>

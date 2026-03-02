@@ -264,7 +264,7 @@ export default function AdminDashboard() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-700 to-slate-500">
         <div className="text-2xl text-emerald-600">Caricamento...</div>
       </div>
     );
@@ -274,13 +274,13 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br">
       <NavBar />
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-20">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-10">
         {/* ── DISPONIBILITÀ CAMPI ── */}
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            📅 Disponibilità Campi
+          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-blue-800 bg-clip-text text-transparent">
+            ✏️ Dashboard Amministratore
             {slotDate && (
               <p className="text-sm text-black mt-1 px-1 capitalize">
                 {" "}
@@ -375,10 +375,10 @@ export default function AdminDashboard() {
                   return (
                     <div
                       key={court._id}
-                      className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
+                      className="bg-white/90 rounded-3xl shadow-lg overflow-hidden "
                     >
                       {/* Header campo */}
-                      <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between">
+                      <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
                         <span className="font-bold text-white text-base">
                           {court.name}
                         </span>
