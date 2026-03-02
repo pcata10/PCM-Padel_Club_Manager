@@ -45,7 +45,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-slate-400">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-slate-400">
       <div className="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8">
         {/* Nome circolo dinamico */}
         <h1 className="font-bold text-gray-900 text-center mb-2 text-xl">
