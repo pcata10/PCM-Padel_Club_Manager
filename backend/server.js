@@ -57,7 +57,13 @@ async function sendBookingNotification({ player, court, booking, organizer }) {
 }
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://pc-padel-project.vercel.app", "http://localhost:5173"],
+    credentials: true,
+  }),
+);
+
 app.use(express.json());
 
 mongoose
