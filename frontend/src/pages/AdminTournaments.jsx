@@ -497,10 +497,8 @@ export default function AdminTournaments() {
   // ── Loading ───────────────────────────────────────────────────
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-700 to-slate-500">
-        <div className="text-2xl text-white font-semibold">
-          Caricamento tornei...
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-400">
+        <div className="text-xl text-emerald-600">Caricando Tornei...</div>
       </div>
     );
 
