@@ -35,6 +35,72 @@ const STATUS_CONFIG = {
   },
 };
 
+const SLOT_STYLES = {
+  free: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  booking: "bg-red-100 text-red-700 border-red-200",
+  blocked: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  academy: "bg-blue-100 text-blue-700 border-blue-200",
+  lesson: "bg-purple-100 text-purple-700 border-purple-200",
+  tournament: "bg-amber-200 text-amber-800 border-amber-400",
+};
+
+const SLOT_STYLES_DESKTOP = {
+  free: "bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-200",
+  booking:
+    "bg-red-100 text-red-700 border-red-200 cursor-pointer hover:brightness-95",
+  blocked:
+    "bg-yellow-100 text-yellow-700 border-yellow-200 cursor-pointer hover:brightness-95",
+  academy:
+    "bg-blue-100 text-blue-700 border-blue-200 cursor-pointer hover:brightness-95",
+  lesson:
+    "bg-purple-100 text-purple-700 border-purple-200 cursor-pointer hover:brightness-95",
+  tournament:
+    "bg-amber-200 text-amber-800 border-amber-400 cursor-not-allowed opacity-80",
+};
+
+const SLOT_ICONS = {
+  free: "🟢",
+  booking: "🔴",
+  blocked: "🔒",
+  academy: "🎓",
+  lesson: "👨‍🏫",
+  tournament: "🏆",
+};
+
+const SLOT_LEGEND = [
+  { type: "free", label: "Libero" },
+  { type: "booking", label: "Prenotato" },
+  { type: "blocked", label: "Bloccato" },
+  { type: "academy", label: "Academy" },
+  { type: "lesson", label: "Lezione" },
+  { type: "tournament", label: "Torneo" },
+];
+
+function buildSlots(dateStr, courtEvts) {
+  const slots = [];
+  for (let h = 8; h <= 21.5; h += 1.5) {
+    const hh = Math.floor(h);
+    const mm = h % 1 === 0.5 ? 30 : 0;
+    const slotStart = new Date(
+      `${dateStr}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
+    );
+    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
+    const isPast = slotStart < new Date();
+    const overlapping = courtEvts.find(
+      (e) => new Date(e.start) < slotEnd && new Date(e.end) > slotStart,
+    );
+    let type = "free";
+    if (overlapping) type = overlapping.extendedProps?.type || "booking";
+    slots.push({
+      time: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
+      type,
+      isPast,
+      event: overlapping || null,
+    });
+  }
+  return slots;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ stats: [], courtsStats: [] });
   const [courts, setCourts] = useState([]);
@@ -44,19 +110,16 @@ export default function AdminDashboard() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [cancelledBookings, setCancelledBookings] = useState([]);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [showActive, setShowActive] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(
+  const [slotDate, setSlotDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
   const [modal, setModal] = useState(null);
   const [note, setNote] = useState("");
-  const [slotDate, setSlotDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
   const [slotStart, setSlotStart] = useState("09:00");
   const [blockStart, setBlockStart] = useState("09:00");
   const [blockEnd, setBlockEnd] = useState("11:00");
-  // ── SPONSOR ────────────────────────────────────────────────────────
+
+  // ── SPONSOR ──────────────────────────────────────────────────────
   const [sponsors, setSponsors] = useState([]);
   const [sponsorForm, setSponsorForm] = useState({
     name: "",
@@ -102,10 +165,11 @@ export default function AdminDashboard() {
         ],
       );
       setStats(statsRes.data);
-      const sortedCourts = [...courtsRes.data].sort((a, b) =>
-        a.name.localeCompare(b.name, "it", { numeric: true }),
+      setCourts(
+        [...courtsRes.data].sort((a, b) =>
+          a.name.localeCompare(b.name, "it", { numeric: true }),
+        ),
       );
-      setCourts(sortedCourts);
       setBookings(bookingsRes.data);
 
       const colored = calendarRes.data.map((e) => ({
@@ -117,7 +181,9 @@ export default function AdminDashboard() {
               ? "#a855f7"
               : e.extendedProps?.type === "blocked"
                 ? "#eab308"
-                : COURT_COLORS[e.courtName]?.bg || "#10b981",
+                : e.extendedProps?.type === "tournament"
+                  ? "#f59e0b"
+                  : COURT_COLORS[e.courtName]?.bg || "#10b981",
         borderColor:
           e.extendedProps?.type === "academy"
             ? "#2563eb"
@@ -125,7 +191,9 @@ export default function AdminDashboard() {
               ? "#9333ea"
               : e.extendedProps?.type === "blocked"
                 ? "#ca8a04"
-                : COURT_COLORS[e.courtName]?.border || "#059669",
+                : e.extendedProps?.type === "tournament"
+                  ? "#d97706"
+                  : COURT_COLORS[e.courtName]?.border || "#059669",
       }));
       setEvents(colored);
     } catch (err) {
@@ -133,7 +201,6 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-
     try {
       const cancelledRes = await api.get("/api/admin/bookings/cancelled");
       setCancelledBookings(cancelledRes.data);
@@ -181,22 +248,19 @@ export default function AdminDashboard() {
         );
       }
 
-      // ── Check overlap visivo sugli eventi già caricati ─────────────
       const courtEvents = events.filter(
         (e) => e.extendedProps?.courtId === modal.court._id.toString(),
       );
-      const overlaps = courtEvents.filter((e) => {
-        const eStart = new Date(e.start);
-        const eEnd = new Date(e.end);
-        return eStart < endTime && eEnd > startTime;
-      });
-
+      const overlaps = courtEvents.filter(
+        (e) => new Date(e.start) < endTime && new Date(e.end) > startTime,
+      );
       if (overlaps.length > 0) {
         const labels = {
           booking: "Prenotazione",
           academy: "Academy",
           lesson: "Lezione",
           blocked: "Blocco",
+          tournament: "Torneo",
         };
         const detail = overlaps
           .map(
@@ -207,7 +271,7 @@ export default function AdminDashboard() {
         alert(
           `⚠️ Sovrapposizione con eventi esistenti:\n${detail}\n\nModifica l'orario.`,
         );
-        return; // ← blocca prima ancora di chiamare l'API
+        return;
       }
 
       await api.post("/api/blocked-slots", {
@@ -224,18 +288,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const adminCancelBooking = async (bookingId) => {
-    if (!window.confirm("Cancellare questa prenotazione?")) return;
-    try {
-      await api.patch(`/api/bookings/${bookingId}/cancel`);
-      fetchData();
-    } catch (err) {
-      alert(err.response?.data?.msg || "Errore cancellazione");
-    }
-  };
-
   const handleEventClick = async (info) => {
     const type = info.event.extendedProps?.type;
+    if (type === "tournament") return; // ← slot torneo: sola lettura
     if (type === "academy" || type === "lesson" || type === "blocked") {
       const labels = {
         academy: "🎓 Academy",
@@ -257,8 +312,35 @@ export default function AdminDashboard() {
         }
       }
     } else {
-      // ── PRENOTAZIONE UTENTE → apri modal dettagli ──
       setModal({ type: "booking", event: info.event });
+    }
+  };
+
+  const handleSlotClick = (slot, court, dateStr) => {
+    if (slot.isPast) return;
+    if (slot.type === "tournament") return; // ← non cliccabile
+    if (slot.type === "free") {
+      const end = new Date(`${dateStr}T${slot.time}:00`);
+      end.setMinutes(end.getMinutes() + 90);
+      setSlotDate(dateStr);
+      setSlotStart(slot.time);
+      setBlockStart(slot.time);
+      setBlockEnd(
+        `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
+      );
+      setNote("");
+      setModal({ court, status: "blocked", mobileSlot: true });
+    } else if (slot.event) {
+      handleEventClick({
+        event: {
+          ...slot.event,
+          id: slot.event.id,
+          start: new Date(slot.event.start),
+          end: new Date(slot.event.end),
+          extendedProps: slot.event.extendedProps,
+          title: slot.event.title,
+        },
+      });
     }
   };
 
@@ -269,21 +351,20 @@ export default function AdminDashboard() {
       </div>
     );
 
-  const futureBookings = bookings.filter(
-    (b) => new Date(b.startTime) > new Date(),
+  const dayEvents = events.filter(
+    (e) => new Date(e.start).toISOString().slice(0, 10) === slotDate,
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-300">
       <NavBar />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-10">
-        {/* ── DISPONIBILITÀ CAMPI ── */}
+        {/* ── HEADER + DATE PICKER ── */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-blue-800 bg-clip-text text-transparent">
             ✏️ Dashboard Amministratore
             {slotDate && (
-              <p className="text-sm text-black mt-1 px-1 capitalize">
-                {" "}
+              <p className="text-sm text-black mt-1 px-1 capitalize font-normal">
                 {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
                   weekday: "long",
                   day: "numeric",
@@ -293,9 +374,7 @@ export default function AdminDashboard() {
               </p>
             )}
           </h2>
-
-          {/* Selettore giorno */}
-          <div className="flex justify-center mb-4 gap-2">
+          <div className="flex justify-center mb-4">
             <input
               type="date"
               value={slotDate}
@@ -313,7 +392,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* ── MOBILE: vista slot colorati ── */}
+          {/* ── MOBILE: slot grid ── */}
           {isMobile ? (
             <div className="space-y-4">
               {[...courts]
@@ -321,124 +400,38 @@ export default function AdminDashboard() {
                   a.name.localeCompare(b.name, "it", { numeric: true }),
                 )
                 .map((court) => {
-                  const courtEvents = events.filter(
-                    (e) =>
-                      e.extendedProps?.courtId === court._id &&
-                      new Date(e.start).toISOString().slice(0, 10) ===
-                        selectedDate,
+                  const courtEvents = dayEvents.filter(
+                    (e) => e.extendedProps?.courtId === court._id,
                   );
-
-                  const allSlots = [];
-                  for (let h = 8; h <= 21.5; h += 1.5) {
-                    const hh = Math.floor(h);
-                    const mm = h % 1 === 0.5 ? 30 : 0;
-                    const slotStart = new Date(
-                      `${selectedDate}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
-                    );
-                    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
-                    const isPast = slotStart < new Date();
-
-                    // Trova evento sovrapposto
-                    const overlapping = courtEvents.find(
-                      (e) =>
-                        new Date(e.start) < slotEnd &&
-                        new Date(e.end) > slotStart,
-                    );
-
-                    let slotType = "free";
-                    if (overlapping)
-                      slotType = overlapping.extendedProps?.type || "booking";
-
-                    allSlots.push({
-                      time: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
-                      type: slotType,
-                      isPast,
-                      event: overlapping || null,
-                    });
-                  }
-
-                  const SLOT_STYLES = {
-                    free: "bg-emerald-100 text-emerald-700 border-emerald-200",
-                    booking: "bg-red-100 text-red-700 border-red-200",
-                    blocked: "bg-yellow-100 text-yellow-700 border-yellow-200",
-                    academy: "bg-blue-100 text-blue-700 border-blue-200",
-                    lesson: "bg-purple-100 text-purple-700 border-purple-200",
-                  };
-                  const SLOT_ICONS = {
-                    free: "🟢",
-                    booking: "🔴",
-                    blocked: "🔒",
-                    academy: "🎓",
-                    lesson: "👨‍🏫",
-                  };
-
+                  const allSlots = buildSlots(slotDate, courtEvents);
                   return (
                     <div
                       key={court._id}
-                      className="bg-white/90 rounded-3xl shadow-lg overflow-hidden "
+                      className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
                     >
-                      {/* Header campo */}
                       <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
                         <span className="font-bold text-white text-base">
                           {court.name}
                         </span>
-                        {slotDate && (
-                          <p className="text-sm text-white mt-1 px-1 capitalize">
-                            {" "}
-                            {new Date(
-                              slotDate + "T00:00:00",
-                            ).toLocaleDateString("it-IT", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })}
-                          </p>
-                        )}
+                        <span className="text-xs text-white/80 capitalize">
+                          {new Date(slotDate + "T00:00:00").toLocaleDateString(
+                            "it-IT",
+                            { weekday: "long", day: "numeric", month: "long" },
+                          )}
+                        </span>
                       </div>
-
-                      {/* Griglia slot */}
                       <div className="p-3 grid grid-cols-4 gap-1.5">
                         {allSlots.map((slot) => (
                           <div
                             key={slot.time}
-                            onClick={() => {
-                              if (slot.isPast) return;
-                              if (slot.type === "free") {
-                                const end = new Date(
-                                  `${selectedDate}T${slot.time}:00`,
-                                );
-                                end.setMinutes(end.getMinutes() + 90);
-                                setSlotDate(selectedDate);
-                                setSlotStart(slot.time);
-                                setBlockStart(slot.time);
-                                setBlockEnd(
-                                  `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
-                                );
-                                setNote("");
-                                setModal({
-                                  court,
-                                  status: "blocked",
-                                  mobileSlot: true,
-                                });
-                              } else if (slot.event) {
-                                handleEventClick({
-                                  event: {
-                                    ...slot.event,
-                                    id: slot.event.id,
-                                    start: new Date(slot.event.start),
-                                    end: new Date(slot.event.end),
-                                    extendedProps: slot.event.extendedProps,
-                                    title: slot.event.title,
-                                  },
-                                });
-                              }
-                            }}
-                            className={`
-                              rounded-xl border px-1 py-1.5 text-center transition-all
+                            onClick={() =>
+                              handleSlotClick(slot, court, slotDate)
+                            }
+                            className={`rounded-xl border px-1 py-1.5 text-center transition-all
                               ${slot.isPast ? "opacity-30" : ""}
                               ${SLOT_STYLES[slot.type]}
-                              ${slot.type !== "free" && !slot.isPast ? "cursor-pointer hover:brightness-95" : ""}
+                              ${slot.type === "tournament" ? "cursor-not-allowed" : ""}
+                              ${slot.type !== "free" && slot.type !== "tournament" && !slot.isPast ? "cursor-pointer hover:brightness-95" : ""}
                             `}
                           >
                             <div className="text-xs font-bold leading-tight">
@@ -450,16 +443,8 @@ export default function AdminDashboard() {
                           </div>
                         ))}
                       </div>
-
-                      {/* Legenda mini */}
                       <div className="px-3 pb-3 flex flex-wrap gap-2">
-                        {[
-                          { type: "free", label: "Libero" },
-                          { type: "booking", label: "Prenotato" },
-                          { type: "blocked", label: "Bloccato" },
-                          { type: "academy", label: "Academy" },
-                          { type: "lesson", label: "Lezione" },
-                        ].map(({ type, label }) => (
+                        {SLOT_LEGEND.map(({ type, label }) => (
                           <span
                             key={type}
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
@@ -474,20 +459,16 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
-              {/* ── DESKTOP: timeline orizzontale ── */}
+              {/* ── DESKTOP: timeline ── */}
               <CourtTimeline
                 courts={[...courts].sort((a, b) =>
                   a.name.localeCompare(b.name, "it", { numeric: true }),
                 )}
-                events={events.filter(
-                  (e) =>
-                    new Date(e.start).toISOString().slice(0, 10) ===
-                    selectedDate,
-                )}
+                events={dayEvents}
                 onEventClick={handleEventClick}
               />
 
-              {/* ── DESKTOP: griglia slot cliccabili ── */}
+              {/* ── DESKTOP: slot grid ── */}
               <div
                 className={`mt-6 grid gap-4 ${
                   courts.filter((c) => c.status === "available").length === 1
@@ -507,56 +488,10 @@ export default function AdminDashboard() {
                     a.name.localeCompare(b.name, "it", { numeric: true }),
                   )
                   .map((court) => {
-                    const courtEvts = events.filter(
-                      (e) =>
-                        e.extendedProps?.courtId === court._id &&
-                        new Date(e.start).toISOString().slice(0, 10) ===
-                          selectedDate,
+                    const courtEvts = dayEvents.filter(
+                      (e) => e.extendedProps?.courtId === court._id,
                     );
-                    const SLOT_STYLES = {
-                      free: "bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-200",
-                      booking:
-                        "bg-red-100 text-red-700 border-red-200 cursor-pointer hover:brightness-95",
-                      blocked:
-                        "bg-yellow-100 text-yellow-700 border-yellow-200 cursor-pointer hover:brightness-95",
-                      academy:
-                        "bg-blue-100 text-blue-700 border-blue-200 cursor-pointer hover:brightness-95",
-                      lesson:
-                        "bg-purple-100 text-purple-700 border-purple-200 cursor-pointer hover:brightness-95",
-                    };
-                    const SLOT_ICONS = {
-                      free: "🟢",
-                      booking: "🔴",
-                      blocked: "🔒",
-                      academy: "🎓",
-                      lesson: "👨‍🏫",
-                    };
-                    const allSlots = [];
-                    for (let h = 8; h <= 21.5; h += 1.5) {
-                      const hh = Math.floor(h);
-                      const mm = h % 1 === 0.5 ? 30 : 0;
-                      const slotStartTime = new Date(
-                        `${selectedDate}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
-                      );
-                      const slotEndTime = new Date(
-                        slotStartTime.getTime() + 90 * 60000,
-                      );
-                      const isPast = slotStartTime < new Date();
-                      const overlapping = courtEvts.find(
-                        (e) =>
-                          new Date(e.start) < slotEndTime &&
-                          new Date(e.end) > slotStartTime,
-                      );
-                      let type = "free";
-                      if (overlapping)
-                        type = overlapping.extendedProps?.type || "booking";
-                      allSlots.push({
-                        time: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
-                        type,
-                        isPast,
-                        event: overlapping || null,
-                      });
-                    }
+                    const allSlots = buildSlots(slotDate, courtEvts);
                     const freeCount = allSlots.filter(
                       (s) => !s.isPast && s.type === "free",
                     ).length;
@@ -577,41 +512,13 @@ export default function AdminDashboard() {
                           {allSlots.map((slot) => (
                             <div
                               key={slot.time}
-                              onClick={() => {
-                                if (slot.isPast) return;
-                                if (slot.type === "free") {
-                                  const end = new Date(
-                                    `${selectedDate}T${slot.time}:00`,
-                                  );
-                                  end.setMinutes(end.getMinutes() + 90);
-                                  setSlotDate(selectedDate);
-                                  setSlotStart(slot.time);
-                                  setBlockStart(slot.time);
-                                  setBlockEnd(
-                                    `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
-                                  );
-                                  setNote("");
-                                  setModal({
-                                    court,
-                                    status: "blocked",
-                                    mobileSlot: true,
-                                  });
-                                } else if (slot.event) {
-                                  handleEventClick({
-                                    event: {
-                                      ...slot.event,
-                                      id: slot.event.id,
-                                      start: new Date(slot.event.start),
-                                      end: new Date(slot.event.end),
-                                      extendedProps: slot.event.extendedProps,
-                                      title: slot.event.title,
-                                    },
-                                  });
-                                }
-                              }}
+                              onClick={() =>
+                                handleSlotClick(slot, court, slotDate)
+                              }
                               className={`rounded-xl border px-1 py-1.5 text-center transition-all duration-150
                                 ${slot.isPast ? "opacity-25" : ""}
-                                ${SLOT_STYLES[slot.type]}`}
+                                ${SLOT_STYLES_DESKTOP[slot.type]}
+                              `}
                             >
                               <div className="text-xs font-bold leading-tight">
                                 {slot.time}
@@ -623,13 +530,7 @@ export default function AdminDashboard() {
                           ))}
                         </div>
                         <div className="px-3 pb-3 flex flex-wrap gap-1.5">
-                          {[
-                            { type: "free", label: "Libero" },
-                            { type: "booking", label: "Prenotato" },
-                            { type: "blocked", label: "Bloccato" },
-                            { type: "academy", label: "Academy" },
-                            { type: "lesson", label: "Lezione" },
-                          ].map(({ type, label }) => (
+                          {SLOT_LEGEND.map(({ type, label }) => (
                             <span
                               key={type}
                               className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
@@ -642,23 +543,20 @@ export default function AdminDashboard() {
                     );
                   })}
               </div>
-            </>
-          )}
 
-          {/* Aggiorna (solo desktop) */}
-          {!isMobile && (
-            <div className="flex justify-center mt-4">
-              <button
-                onClick={fetchData}
-                className="px-6 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold text-sm"
-              >
-                🔄 Aggiorna
-              </button>
-            </div>
+              <div className="flex justify-center mt-4">
+                <button
+                  onClick={fetchData}
+                  className="px-6 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 font-semibold text-sm"
+                >
+                  🔄 Aggiorna
+                </button>
+              </div>
+            </>
           )}
         </div>
 
-        {/* ── STORICO CANCELLATE ── */}
+        {/* ── PRENOTAZIONI CANCELLATE ── */}
         <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
           <div className="flex justify-between items-center mb-5">
             <h2 className="text-xl md:text-2xl font-bold text-gray-800">
@@ -672,204 +570,193 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          {showCancelled && (
-            <>
-              {isMobile ? (
-                <div className="space-y-3">
-                  {cancelledBookings.map((booking) => (
-                    <div
-                      key={booking._id}
-                      className="bg-red-50 rounded-2xl p-4 border border-red-100 opacity-80"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="font-bold text-gray-700">
-                          {booking.player1?.name}
-                        </div>
-                        <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold">
-                          Cancellata
-                        </span>
+          {showCancelled &&
+            (isMobile ? (
+              <div className="space-y-3">
+                {cancelledBookings.map((booking) => (
+                  <div
+                    key={booking._id}
+                    className="bg-red-50 rounded-2xl p-4 border border-red-100 opacity-80"
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-bold text-gray-700">
+                        {booking.player1?.name}
                       </div>
-                      <div className="text-xs text-gray-400 mb-1">
-                        {booking.player1?.email}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        🏸 {booking.court?.name}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        📅{" "}
-                        {new Date(booking.startTime).toLocaleString("it-IT", {
-                          weekday: "short",
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                      {booking.cancelledAt && (
-                        <div className="text-xs text-red-400 mt-1">
-                          🗑 Cancellata il{" "}
-                          {new Date(booking.cancelledAt).toLocaleString(
-                            "it-IT",
-                          )}
-                          {booking.cancelledBy?.name &&
-                            ` da ${booking.cancelledBy.name}`}
-                        </div>
-                      )}
+                      <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold">
+                        Cancellata
+                      </span>
                     </div>
-                  ))}
-                  {cancelledBookings.length === 0 && (
-                    <p className="text-center text-gray-400 py-8">
-                      Nessuna prenotazione cancellata
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto rounded-2xl">
-                  <table className="w-full text-left">
-                    <thead className="bg-gradient-to-r from-red-400 to-rose-500 text-white">
-                      <tr>
-                        <th className="py-4 px-6 rounded-tl-2xl">Giocatore</th>
-                        <th className="py-4 px-6">Campo</th>
-                        <th className="py-4 px-6">Data prenotazione</th>
-                        <th className="py-4 px-6">Durata</th>
-                        <th className="py-4 px-6 rounded-tr-2xl">
-                          Cancellata il
-                        </th>
+                    <div className="text-xs text-gray-400 mb-1">
+                      {booking.player1?.email}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      🏸 {booking.court?.name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      📅{" "}
+                      {new Date(booking.startTime).toLocaleString("it-IT", {
+                        weekday: "short",
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                    {booking.cancelledAt && (
+                      <div className="text-xs text-red-400 mt-1">
+                        🗑 Cancellata il{" "}
+                        {new Date(booking.cancelledAt).toLocaleString("it-IT")}
+                        {booking.cancelledBy?.name &&
+                          ` da ${booking.cancelledBy.name}`}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {cancelledBookings.length === 0 && (
+                  <p className="text-center text-gray-400 py-8">
+                    Nessuna prenotazione cancellata
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl">
+                <table className="w-full text-left">
+                  <thead className="bg-gradient-to-r from-red-400 to-rose-500 text-white">
+                    <tr>
+                      <th className="py-4 px-6 rounded-tl-2xl">Giocatore</th>
+                      <th className="py-4 px-6">Campo</th>
+                      <th className="py-4 px-6">Data prenotazione</th>
+                      <th className="py-4 px-6">Durata</th>
+                      <th className="py-4 px-6 rounded-tr-2xl">
+                        Cancellata il
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cancelledBookings.map((booking, i) => (
+                      <tr
+                        key={booking._id}
+                        className={`border-b border-gray-100 opacity-75 ${i % 2 === 0 ? "bg-red-50/50" : "bg-white"}`}
+                      >
+                        <td className="py-4 px-6 font-bold text-gray-700">
+                          {booking.player1?.name}
+                          <div className="text-xs text-gray-400 font-normal">
+                            {booking.player1?.email}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-gray-600">
+                          {booking.court?.name}
+                        </td>
+                        <td className="py-4 px-6 text-gray-600">
+                          {new Date(booking.startTime).toLocaleString("it-IT")}
+                        </td>
+                        <td className="py-4 px-6 text-gray-600">
+                          {booking.duration || "—"}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="text-red-500 text-sm font-semibold">
+                            {booking.cancelledAt
+                              ? new Date(booking.cancelledAt).toLocaleString(
+                                  "it-IT",
+                                )
+                              : "—"}
+                          </div>
+                          {booking.cancelledBy?.name && (
+                            <div className="text-xs text-gray-400">
+                              da {booking.cancelledBy.name}
+                            </div>
+                          )}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {cancelledBookings.map((booking, i) => (
-                        <tr
-                          key={booking._id}
-                          className={`border-b border-gray-100 opacity-75 ${i % 2 === 0 ? "bg-red-50/50" : "bg-white"}`}
+                    ))}
+                    {cancelledBookings.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="py-12 text-center text-gray-400 text-xl"
                         >
-                          <td className="py-4 px-6 font-bold text-gray-700">
-                            {booking.player1?.name}
-                            <div className="text-xs text-gray-400 font-normal">
-                              {booking.player1?.email}
-                            </div>
-                          </td>
-                          <td className="py-4 px-6 text-gray-600">
-                            {booking.court?.name}
-                          </td>
-                          <td className="py-4 px-6 text-gray-600">
-                            {new Date(booking.startTime).toLocaleString(
-                              "it-IT",
-                            )}
-                          </td>
-                          <td className="py-4 px-6 text-gray-600">
-                            {booking.duration || "—"}
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="text-red-500 text-sm font-semibold">
-                              {booking.cancelledAt
-                                ? new Date(booking.cancelledAt).toLocaleString(
-                                    "it-IT",
-                                  )
-                                : "—"}
-                            </div>
-                            {booking.cancelledBy?.name && (
-                              <div className="text-xs text-gray-400">
-                                da {booking.cancelledBy.name}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {cancelledBookings.length === 0 && (
-                        <tr>
-                          <td
-                            colSpan="5"
-                            className="py-12 text-center text-gray-400 text-xl"
-                          >
-                            Nessuna prenotazione cancellata
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      {/* ── GESTIONE SPONSOR ── */}
-      <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
-          🏷️ Sponsor
-        </h2>
-
-        {/* Form aggiunta */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-          <input
-            placeholder="Nome sponsor *"
-            value={sponsorForm.name}
-            onChange={(e) =>
-              setSponsorForm({ ...sponsorForm, name: e.target.value })
-            }
-            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-          />
-          <input
-            placeholder="URL Logo (https://...) *"
-            value={sponsorForm.logoUrl}
-            onChange={(e) =>
-              setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })
-            }
-            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-          />
-          <input
-            placeholder="URL sito sponsor"
-            value={sponsorForm.linkUrl}
-            onChange={(e) =>
-              setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })
-            }
-            className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-          />
-          <button
-            onClick={addSponsor}
-            className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600"
-          >
-            ➕ Aggiungi
-          </button>
+                          Nessuna prenotazione cancellata
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ))}
         </div>
 
-        {/* Lista sponsor */}
-        <div className="flex flex-wrap gap-4">
-          {sponsors.map((s) => (
-            <div
-              key={s._id}
-              className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border"
+        {/* ── GESTIONE SPONSOR ── */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
+            🏷️ Sponsor
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+            <input
+              placeholder="Nome sponsor *"
+              value={sponsorForm.name}
+              onChange={(e) =>
+                setSponsorForm({ ...sponsorForm, name: e.target.value })
+              }
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+            />
+            <input
+              placeholder="URL Logo (https://...) *"
+              value={sponsorForm.logoUrl}
+              onChange={(e) =>
+                setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })
+              }
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+            />
+            <input
+              placeholder="URL sito sponsor"
+              value={sponsorForm.linkUrl}
+              onChange={(e) =>
+                setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })
+              }
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
+            />
+            <button
+              onClick={addSponsor}
+              className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600"
             >
-              <img
-                src={s.logoUrl}
-                alt={s.name}
-                className="h-8 object-contain"
-              />
-              <span className="font-semibold text-gray-700 text-sm">
-                {s.name}
-              </span>
-              <button
-                onClick={() => deleteSponsor(s._id)}
-                className="text-red-400 hover:text-red-600 text-lg font-bold"
+              ➕ Aggiungi
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {sponsors.map((s) => (
+              <div
+                key={s._id}
+                className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border"
               >
-                ✕
-              </button>
-            </div>
-          ))}
-          {sponsors.length === 0 && (
-            <p className="text-gray-400 text-sm">Nessuno sponsor aggiunto</p>
-          )}
+                <img
+                  src={s.logoUrl}
+                  alt={s.name}
+                  className="h-8 object-contain"
+                />
+                <span className="font-semibold text-gray-700 text-sm">
+                  {s.name}
+                </span>
+                <button
+                  onClick={() => deleteSponsor(s._id)}
+                  className="text-red-400 hover:text-red-600 text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {sponsors.length === 0 && (
+              <p className="text-gray-400 text-sm">Nessuno sponsor aggiunto</p>
+            )}
+          </div>
         </div>
       </div>
-
       <SponsorFooter />
 
       {/* ── MODAL ── */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-3xl p-6 md:p-8 shadow-2xl max-w-md w-full overflow-hidden">
-            {/* ── BOOKING ── */}
+            {/* BOOKING */}
             {modal.type === "booking" && (
               <>
                 <div className="flex items-center justify-between mb-4">
@@ -992,7 +879,7 @@ export default function AdminDashboard() {
               </>
             )}
 
-            {/* ── SLOT (blocked / academy / lesson) ── */}
+            {/* SLOT: blocked / academy / lesson */}
             {modal.type !== "booking" && (
               <>
                 <h3 className="text-xl md:text-2xl font-bold mb-1 text-gray-800">
@@ -1009,20 +896,19 @@ export default function AdminDashboard() {
                       <button
                         key={s}
                         onClick={() => setModal({ ...modal, status: s })}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all
-                          ${
-                            modal.status === s
-                              ? s === "blocked"
-                                ? "bg-red-500 text-white"
-                                : s === "academy"
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-purple-500 text-white"
-                              : s === "blocked"
-                                ? "bg-red-100 text-red-700"
-                                : s === "academy"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-purple-100 text-purple-700"
-                          }`}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                          modal.status === s
+                            ? s === "blocked"
+                              ? "bg-red-500 text-white"
+                              : s === "academy"
+                                ? "bg-blue-500 text-white"
+                                : "bg-purple-500 text-white"
+                            : s === "blocked"
+                              ? "bg-red-100 text-red-700"
+                              : s === "academy"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-purple-100 text-purple-700"
+                        }`}
                       >
                         {STATUS_CONFIG[s].icon}
                         <br />

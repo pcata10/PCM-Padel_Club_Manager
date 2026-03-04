@@ -13,6 +13,11 @@ const TYPE_COLORS = {
     text: "text-gray-800",
     border: "border-yellow-500",
   },
+  tournament: {
+    bg: "bg-gray-500",
+    text: "text-white",
+    border: "border-gray-600",
+  }, // ← nuovo
 };
 
 const TYPE_LABELS = {
@@ -20,6 +25,7 @@ const TYPE_LABELS = {
   academy: "🎓 Academy",
   lesson: "👨‍🏫 Lezione",
   blocked: "🔒 Bloccato",
+  tournament: "🏆 Torneo", // ← nuovo
 };
 
 const START_HOUR = 8;
