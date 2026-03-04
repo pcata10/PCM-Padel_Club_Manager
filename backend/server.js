@@ -36,8 +36,6 @@ const T_POPULATE = [
   { path: "players", select: "name surname email level" },
   { path: "couples.player1", select: "name surname" },
   { path: "couples.player2", select: "name surname" },
-  { path: "matches.player1", select: "name surname" },
-  { path: "matches.player2", select: "name surname" },
 ];
 
 // ── MAILER ─────────────────────────────────────────────────────────

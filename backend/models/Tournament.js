@@ -1,41 +1,53 @@
 const mongoose = require("mongoose");
 
-const matchSchema = new mongoose.Schema({
-  couple1: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
-  couple2: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
-  score: { type: String, default: "" },
-  winner: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
-  phase: { type: String, enum: ["group", "gold", "silver"], default: "group" },
-  group: { type: Number },
-  round: { type: String }, // "F", "SF", "QF", "R16", "R32"
-  court: { type: mongoose.Schema.Types.ObjectId, ref: "Court" },
-  time: { type: String },
-});
+const matchSchema = new mongoose.Schema(
+  {
+    player1: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
+    player2: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
+    score: { type: String, default: "" },
+    winner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Player",
+      default: null,
+    },
+  },
+  { _id: true },
+);
 
-const coupleSchema = new mongoose.Schema({
-  player1: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
-  player2: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
-  guestName: { type: String, default: "" }, // ← AGGIUNGI
+const coupleSchema = new mongoose.Schema(
+  {
+    player1: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
+    player2: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Player",
+      default: null,
+    },
+    guestName: { type: String, default: "" },
+    name: { type: String, default: "" },
+    seeded: { type: Boolean, default: false },
+  },
+  { _id: true },
+);
 
-  name: { type: String, default: "" },
-  seeded: { type: Boolean, default: false },
-});
-
-const groupSchema = new mongoose.Schema({
-  number: { type: Number },
-  couples: [{ type: mongoose.Schema.Types.ObjectId }],
-});
+const groupSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "" },
+    couples: [{ type: mongoose.Schema.Types.ObjectId }],
+    matches: [matchSchema],
+  },
+  { _id: true },
+);
 
 const tournamentSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, default: "Torneo Padel" },
     date: { type: Date, required: true },
     startTime: { type: String, default: "09:00" },
-    endTime: { type: String, default: "18:00" },
+    endTime: { type: String, default: "21:00" },
     level: {
       type: String,
-      enum: ["intermedio", "agonista"],
-      default: "intermedio",
+      enum: ["open", "principiante", "intermedio", "avanzato", "agonista"],
+      default: "open",
     },
     status: {
       type: String,
@@ -51,5 +63,4 @@ const tournamentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports =
-  mongoose.models.Tournament || mongoose.model("Tournament", tournamentSchema);
+module.exports = mongoose.model("Tournament", tournamentSchema);
