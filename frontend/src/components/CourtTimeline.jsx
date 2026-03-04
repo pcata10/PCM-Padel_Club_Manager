@@ -1,5 +1,16 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 
+function toItalyHours(dateInput) {
+  const d = new Date(dateInput);
+  // Restituisce ore e minuti nell'ora italiana
+  const str = d.toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Rome",
+  });
+  const [h, m] = str.split(":").map(Number);
+  return h + m / 60;
+}
 const TYPE_COLORS = {
   booking: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
   academy: { bg: "bg-blue-500", text: "text-white", border: "border-blue-600" },

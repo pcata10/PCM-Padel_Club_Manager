@@ -135,7 +135,7 @@ export default function Book() {
         `${API}/api/bookings`,
         {
           court: selectedSlot.courtId,
-          startTime: start.toISOString(),
+          startTime: `${selectedDate}T${selectedSlot.time}:00+01:00`,
           duration: "1h30min",
           players: form.players.filter((p) => p.trim() !== ""),
         },

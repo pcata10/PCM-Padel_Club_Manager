@@ -235,17 +235,19 @@ export default function AdminDashboard() {
     try {
       let startTime, endTime;
       if (modal.status === "blocked") {
-        startTime = new Date(`${slotDate}T${blockStart}:00`);
-        endTime = new Date(`${slotDate}T${blockEnd}:00`);
+        startTime = `${slotDate}T${blockStart}:00+01:00`;
+        endTime = `${slotDate}T${blockEnd}:00+01:00`;
         if (endTime <= startTime) {
           alert("L'ora di fine deve essere dopo l'ora di inizio");
           return;
         }
       } else {
-        startTime = new Date(`${slotDate}T${slotStart}:00`);
-        endTime = new Date(
-          startTime.getTime() + (modal.status === "academy" ? 90 : 60) * 60000,
+        startTime = `${slotDate}T${slotStart}:00+01:00`;
+        const endDate = new Date(
+          new Date(startTime).getTime() +
+            (modal.status === "academy" ? 90 : 60) * 60000,
         );
+        endTime = endDate.toISOString();
       }
 
       const courtEvents = events.filter(
