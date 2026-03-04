@@ -1,5 +1,5 @@
 module.exports = {
-  clubName: process.env.CLUB_NAME || "Padel Club Marseglia",
+  clubName: process.env.CLUB_NAME || "Padel Club ",
   clubShortName: process.env.CLUB_SHORT_NAME || "PC",
   clubEmail: process.env.CLUB_EMAIL || "",
   clubPhone: process.env.CLUB_PHONE || "",

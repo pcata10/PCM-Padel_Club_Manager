@@ -15,6 +15,8 @@ const getRole = () => {
   }
 };
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -27,10 +29,7 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/login`,
-        form,
-      );
+      const res = await axios.post(`${API}/api/login`, form);
       localStorage.setItem("token", res.data.token);
       // ← AGGIUNGI QUESTA RIGA
       localStorage.setItem(

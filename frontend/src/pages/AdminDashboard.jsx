@@ -347,7 +347,9 @@ export default function AdminDashboard() {
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-700 to-slate-500">
-        <div className="text-2xl text-emerald-600">Caricamento...</div>
+        <div className="text-2xl text-white-600">
+          Caricamento Admin Dashboard...
+        </div>
       </div>
     );
 

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+
 export default function Register() {
   const [form, setForm] = useState({
     email: "",
@@ -19,8 +21,18 @@ export default function Register() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("http://localhost:4000/api/register", form);
+      const res = await axios.post(`${API}/api/register`, form); // ← fix
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          // ← aggiungi
+          id: res.data.player?.id || res.data.player?._id,
+          name: res.data.player?.name,
+          email: res.data.player?.email,
+          role: res.data.player?.role || "player",
+        }),
+      );
       axios.defaults.headers.common["Authorization"] =
         `Bearer ${res.data.token}`;
       navigate("/dashboard");
@@ -36,7 +48,6 @@ export default function Register() {
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
           Registrazione
         </h2>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -50,7 +61,6 @@ export default function Register() {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email
@@ -63,7 +73,6 @@ export default function Register() {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Password
@@ -76,7 +85,6 @@ export default function Register() {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Livello
@@ -92,7 +100,6 @@ export default function Register() {
               <option value="agonista">Agonista</option>
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mano
@@ -107,13 +114,11 @@ export default function Register() {
               <option value="ambidestro">Ambidestro</option>
             </select>
           </div>
-
           {error && (
             <div className="p-3 bg-red-100 border border-red-300 rounded-xl text-red-800 text-sm">
               {error}
             </div>
           )}
-
           <button
             type="submit"
             disabled={loading}
@@ -122,7 +127,6 @@ export default function Register() {
             {loading ? "Caricamento..." : "Registrati"}
           </button>
         </form>
-
         <p className="text-center mt-6 text-sm text-gray-600">
           Hai già account?{" "}
           <Link
