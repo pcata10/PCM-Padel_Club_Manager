@@ -6,7 +6,6 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 
-// ── Models ─────────────────────────────────────────────────────────
 const Court = require("./models/Court");
 const Player = require("./models/Player");
 const Booking = require("./models/Booking");
@@ -15,28 +14,33 @@ const Tournament = require("./models/Tournament");
 const Sponsor = require("./models/Sponsor");
 const config = require("./config");
 
-// ── App ────────────────────────────────────────────────────────────
-const app = express();
-const PORT = process.env.PORT || 4000;
+// ── TIMEZONE HELPER ────────────────────────────────────────────────
+// Converte "2026-03-10" + "09:00" → Date UTC corretta per l'Italia
+function italyTime(dateStr, timeStr) {
+  return new Date(`${dateStr}T${timeStr}:00+01:00`);
+}
 
-app.use(
-  cors({
-    origin: [
-      "https://pc-padel-project.vercel.app",
-      "http://localhost:5173",
-      "http://192.168.178.142:5173",
-    ],
-    credentials: true,
-  }),
-);
-app.use(express.json());
+// Normalizza una stringa datetime in arrivo dal frontend
+// Se già ha offset (+01:00 / Z) la lascia, altrimenti aggiunge +01:00
+function toDate(str) {
+  if (!str) return null;
+  if (typeof str === "object") return str; // già Date
+  const s = String(str);
+  if (s.includes("+") || s.endsWith("Z")) return new Date(s);
+  return new Date(`${s}+01:00`);
+}
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB error:", err));
+// ── POPULATE HELPER ────────────────────────────────────────────────
+const T_POPULATE = [
+  { path: "courts" },
+  { path: "players", select: "name surname email level" },
+  { path: "couples.player1", select: "name surname" },
+  { path: "couples.player2", select: "name surname" },
+  { path: "matches.player1", select: "name surname" },
+  { path: "matches.player2", select: "name surname" },
+];
 
-// ── Mailer ─────────────────────────────────────────────────────────
+// ── MAILER ─────────────────────────────────────────────────────────
 const mailer = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT) || 587,
@@ -51,10 +55,12 @@ async function sendBookingNotification({ player, court, booking, organizer }) {
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Rome",
   });
   const endStr = new Date(booking.endTime).toLocaleTimeString("it-IT", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Rome",
   });
   await mailer.sendMail({
     from: `"Padel Club" <${process.env.SMTP_USER}>`,
@@ -79,7 +85,25 @@ async function sendBookingNotification({ player, court, booking, organizer }) {
   });
 }
 
-// ── Middleware auth ────────────────────────────────────────────────
+// ── APP ────────────────────────────────────────────────────────────
+const app = express();
+app.use(
+  cors({
+    origin: [
+      "https://pc-padel-project.vercel.app",
+      "http://localhost:5173",
+      "http://192.168.178.142:5173",
+    ],
+    credentials: true,
+  }),
+);
+app.use(express.json());
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error(err));
+
 const auth = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ msg: "No token" });
@@ -91,79 +115,23 @@ const auth = (req, res, next) => {
   }
 };
 
-// Helper: verifica che l'utente sia admin
-const requireAdmin = async (req, res) => {
+const adminOnly = async (req, res, next) => {
   const player = await Player.findById(req.user.id);
-  if (!player || player.role !== "admin") {
-    res.status(403).json({ msg: "Admin only" });
-    return null;
-  }
-  return player;
+  if (player?.role !== "admin")
+    return res.status(403).json({ msg: "Admin only" });
+  next();
 };
 
-// ── Populate string comune per Tournament ─────────────────────────
-const T_POPULATE = [
-  { path: "players" },
-  { path: "courts" },
-  { path: "couples.player1" },
-  { path: "couples.player2" },
-];
+const PORT = process.env.PORT || 4000;
 
-// ══════════════════════════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════════════════════════
+// ── INIT ───────────────────────────────────────────────────────────
 app.get("/api/init", async (req, res) => {
   await Court.deleteMany({});
   await Court.insertMany(config.courts.map((name) => ({ name })));
   res.json({ msg: "Dati inizializzati" });
 });
 
-// ══════════════════════════════════════════════════════════════════
-// AUTH
-// ══════════════════════════════════════════════════════════════════
-app.post("/api/register", async (req, res) => {
-  try {
-    const { email, password, name, level, hand } = req.body;
-    const hashed = await bcrypt.hash(password, 10);
-    const player = new Player({ email, password: hashed, name, level, hand });
-    await player.save();
-    const token = jwt.sign(
-      { id: player._id, role: player.role },
-      process.env.JWT_SECRET,
-    );
-    res.json({ token, player: { id: player._id, email, name, level } });
-  } catch (err) {
-    res.status(500).json({ msg: "Errore registrazione", error: err.message });
-  }
-});
-
-app.post("/api/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const player = await Player.findOne({ email });
-    if (!player || !(await bcrypt.compare(password, player.password)))
-      return res.status(400).json({ msg: "Credenziali errate" });
-    const token = jwt.sign(
-      { id: player._id, role: player.role },
-      process.env.JWT_SECRET,
-    );
-    res.json({
-      token,
-      player: {
-        id: player._id,
-        email: player.email,
-        name: player.name,
-        level: player.level,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ msg: "Errore login", error: err.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════
-// CONFIG (pubblico)
-// ══════════════════════════════════════════════════════════════════
+// ── CONFIG ─────────────────────────────────────────────────────────
 app.get("/api/config", (req, res) => {
   res.json({
     clubName: config.clubName,
@@ -180,24 +148,93 @@ app.get("/api/config", (req, res) => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════
-// COURTS
-// ══════════════════════════════════════════════════════════════════
+// ── AUTH ───────────────────────────────────────────────────────────
+app.post("/api/register", async (req, res) => {
+  try {
+    const { email, password, name, level, hand } = req.body;
+    const existing = await Player.findOne({
+      email: email.trim().toLowerCase(),
+    });
+    if (existing) return res.status(400).json({ msg: "Email già registrata" });
+    const hashed = await bcrypt.hash(password, 10);
+    const player = new Player({
+      email: email.trim().toLowerCase(),
+      password: hashed,
+      name,
+      level,
+      hand,
+    });
+    await player.save();
+    const token = jwt.sign(
+      { id: player._id, role: player.role },
+      process.env.JWT_SECRET,
+    );
+    res.json({
+      token,
+      player: {
+        id: player._id,
+        email: player.email,
+        name,
+        level,
+        role: player.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Errore registrazione", error: err.message });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const player = await Player.findOne({ email: email.trim().toLowerCase() });
+    if (!player || !(await bcrypt.compare(password, player.password)))
+      return res.status(400).json({ msg: "Credenziali errate" });
+    const token = jwt.sign(
+      { id: player._id, role: player.role },
+      process.env.JWT_SECRET,
+    );
+    res.json({
+      token,
+      player: {
+        id: player._id,
+        email: player.email,
+        name: player.name,
+        level: player.level,
+        role: player.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Errore login", error: err.message });
+  }
+});
+
+// ── COURTS ────────────────────────────────────────────────────────
 app.get("/api/courts", async (req, res) => {
   res.json(await Court.find());
 });
 
-app.put("/api/admin/courts/:id", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+app.put("/api/admin/courts/:id", auth, adminOnly, async (req, res) => {
   const court = await Court.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
   });
   res.json(court);
 });
 
-// ══════════════════════════════════════════════════════════════════
-// AVAILABILITY (pubblica)
-// ══════════════════════════════════════════════════════════════════
+// ── PLAYERS ───────────────────────────────────────────────────────
+app.get("/api/admin/players", auth, adminOnly, async (req, res) => {
+  try {
+    const players = await Player.find()
+      .select("-password")
+      .sort({ name: 1 })
+      .lean();
+    res.json(players);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore", error: err.message });
+  }
+});
+
+// ── AVAILABILITY ──────────────────────────────────────────────────
 app.get("/api/availability", async (req, res) => {
   try {
     const [bookings, blocked] = await Promise.all([
@@ -210,67 +247,7 @@ app.get("/api/availability", async (req, res) => {
   }
 });
 
-// ══════════════════════════════════════════════════════════════════
-// SLOTS DISPONIBILI
-// ══════════════════════════════════════════════════════════════════
-app.get("/api/slots/:courtId", async (req, res) => {
-  const courtId = req.params.courtId;
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
-
-  const court = await Court.findById(courtId).lean();
-  if (!court || court.status !== "available") return res.json([]);
-
-  const dayStart = new Date(`${date}T00:00:00`);
-  const dayEnd = new Date(`${date}T23:59:59`);
-
-  const [dayBookings, dayBlocked] = await Promise.all([
-    Booking.find({
-      court: courtId,
-      status: "confirmed",
-      startTime: { $lt: dayEnd },
-      endTime: { $gt: dayStart },
-    }).lean(),
-    BlockedSlot.find({
-      court: courtId,
-      startTime: { $lt: dayEnd },
-      endTime: { $gt: dayStart },
-    }).lean(),
-  ]);
-
-  const slots = [];
-  const startHour = ["Campo 2", "Campo 4"].includes(court.name) ? 8.5 : 8;
-
-  for (let h = startHour; h <= 21.5; h += 1.5) {
-    const hh = Math.floor(h);
-    const mm = h % 1 === 0.5 ? 30 : 0;
-    const slotStart = new Date(
-      `${date}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
-    );
-    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
-
-    const hasBooking = dayBookings.some(
-      (b) => new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,
-    );
-    const hasBlocked = dayBlocked.some(
-      (b) => new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,
-    );
-
-    if (!hasBooking && !hasBlocked) {
-      const endH = Math.floor(h + 1.5);
-      const endM = (h + 1.5) % 1 === 0.5 ? 30 : 0;
-      slots.push({
-        start: `${date}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
-        end: `${date}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
-        duration: "1h30min",
-      });
-    }
-  }
-  res.json(slots);
-});
-
-// ══════════════════════════════════════════════════════════════════
-// BOOKINGS
-// ══════════════════════════════════════════════════════════════════
+// ── BOOKINGS ──────────────────────────────────────────────────────
 app.get("/api/bookings", auth, async (req, res) => {
   const bookings = await Booking.find({
     player1: req.user.id,
@@ -286,7 +263,7 @@ app.post("/api/bookings", auth, async (req, res) => {
       return res.status(400).json({ msg: "Durata deve essere 1h o 1h30min" });
 
     const minutes = duration === "1h" ? 60 : 90;
-    const start = new Date(startTime);
+    const start = toDate(startTime);
     const end = new Date(start.getTime() + minutes * 60000);
 
     const courtDoc = await Court.findById(court);
@@ -305,17 +282,18 @@ app.post("/api/bookings", auth, async (req, res) => {
     const guestPlayers = [];
     for (const input of rawPlayers) {
       if (!input?.trim()) continue;
+      const trimmed = input.trim();
       const found = await Player.findOne({
         $or: [
-          { email: input.trim().toLowerCase() },
-          { name: { $regex: new RegExp(`^${input.trim()}$`, "i") } },
+          { email: trimmed.toLowerCase() },
+          { name: { $regex: new RegExp(`^${trimmed}$`, "i") } },
         ],
       });
       if (found) {
         if (found._id.toString() !== req.user.id)
           registeredPlayerIds.push(found._id);
       } else {
-        guestPlayers.push(input.trim());
+        guestPlayers.push(trimmed);
       }
     }
 
@@ -345,7 +323,6 @@ app.post("/api/bookings", auth, async (req, res) => {
         );
       }
     }
-
     res.json({ msg: `Prenotazione ${duration} confermata! 🎾`, booking });
   } catch (err) {
     console.error("❌ BOOKING ERROR:", err.message, err.stack);
@@ -389,7 +366,7 @@ app.patch("/api/bookings/:id/cancel", auth, async (req, res) => {
     if (!booking)
       return res.status(404).json({ msg: "Prenotazione non trovata" });
     if (booking.status === "cancelled")
-      return res.status(400).json({ msg: "Già cancellata" });
+      return res.status(400).json({ msg: "Prenotazione già cancellata" });
     const player = await Player.findById(req.user.id);
     if (booking.player1.toString() !== req.user.id && player.role !== "admin")
       return res.status(403).json({ msg: "Non autorizzato" });
@@ -418,11 +395,8 @@ app.delete("/api/bookings/:id", auth, async (req, res) => {
   res.json({ msg: "Prenotazione cancellata" });
 });
 
-// ══════════════════════════════════════════════════════════════════
-// ADMIN BOOKINGS
-// ══════════════════════════════════════════════════════════════════
-app.get("/api/admin/bookings", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+// ── ADMIN BOOKINGS ────────────────────────────────────────────────
+app.get("/api/admin/bookings", auth, adminOnly, async (req, res) => {
   const bookings = await Booking.find({ status: "confirmed" })
     .populate("court player1")
     .sort({ startTime: 1 })
@@ -430,9 +404,8 @@ app.get("/api/admin/bookings", auth, async (req, res) => {
   res.json(bookings);
 });
 
-app.get("/api/admin/bookings/cancelled", auth, async (req, res) => {
+app.get("/api/admin/bookings/cancelled", auth, adminOnly, async (req, res) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
     const cancelled = await Booking.find({ status: "cancelled" })
       .populate("court player1 cancelledBy")
       .sort({ cancelledAt: -1 })
@@ -443,8 +416,7 @@ app.get("/api/admin/bookings/cancelled", auth, async (req, res) => {
   }
 });
 
-app.delete("/api/admin/bookings/:id", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+app.delete("/api/admin/bookings/:id", auth, adminOnly, async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking)
     return res.status(404).json({ msg: "Prenotazione non trovata" });
@@ -453,32 +425,40 @@ app.delete("/api/admin/bookings/:id", auth, async (req, res) => {
   res.json({ msg: "Prenotazione cancellata dall'admin" });
 });
 
-// ══════════════════════════════════════════════════════════════════
-// BLOCKED SLOTS
-// ══════════════════════════════════════════════════════════════════
+// ── BLOCKED SLOTS ─────────────────────────────────────────────────
 app.get("/api/blocked-slots", auth, async (req, res) => {
   res.json(await BlockedSlot.find().populate("court"));
 });
 
-app.post("/api/blocked-slots", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
-  const { court, type, startTime, endTime, note } = req.body;
+app.post("/api/blocked-slots", auth, adminOnly, async (req, res) => {
+  const { court, type, startTime, endTime, note, tournamentId } = req.body;
+  // ← usa toDate() per correggere il timezone
+  const start = toDate(startTime);
+  const end = toDate(endTime);
+
   const overlap = await Booking.findOne({
     court,
     status: "confirmed",
-    startTime: { $lt: new Date(endTime) },
-    endTime: { $gt: new Date(startTime) },
+    startTime: { $lt: end },
+    endTime: { $gt: start },
   });
   if (overlap)
     return res.status(400).json({ msg: "Slot già prenotato da un utente" });
-  const slot = new BlockedSlot({ court, type, startTime, endTime, note });
+
+  const slot = new BlockedSlot({
+    court,
+    type,
+    startTime: start,
+    endTime: end,
+    note,
+    tournamentId,
+  });
   await slot.save();
   res.json(slot);
 });
 
-app.delete("/api/blocked-slots/:id", auth, async (req, res) => {
+app.delete("/api/blocked-slots/:id", auth, adminOnly, async (req, res) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
     const slot = await BlockedSlot.findByIdAndDelete(req.params.id);
     if (!slot) return res.status(404).json({ msg: "Slot non trovato" });
     res.json({ msg: "Slot rimosso" });
@@ -487,9 +467,63 @@ app.delete("/api/blocked-slots/:id", auth, async (req, res) => {
   }
 });
 
-// ══════════════════════════════════════════════════════════════════
-// CALENDAR
-// ══════════════════════════════════════════════════════════════════
+// ── SLOTS DISPONIBILI ─────────────────────────────────────────────
+app.get("/api/slots/:courtId", async (req, res) => {
+  const courtId = req.params.courtId;
+  const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+  const court = await Court.findById(courtId).lean();
+  if (!court || court.status !== "available") return res.json([]);
+
+  // Usa offset italiano per la finestra giornaliera
+  const dayStart = italyTime(date, "00:00");
+  const dayEnd = italyTime(date, "23:59");
+
+  const [dayBookings, dayBlocked] = await Promise.all([
+    Booking.find({
+      court: courtId,
+      status: "confirmed",
+      startTime: { $lt: dayEnd },
+      endTime: { $gt: dayStart },
+    }).lean(),
+    BlockedSlot.find({
+      court: courtId,
+      startTime: { $lt: dayEnd },
+      endTime: { $gt: dayStart },
+    }).lean(),
+  ]);
+
+  const slots = [];
+  const startHour = ["Campo 2", "Campo 4"].includes(court.name) ? 8.5 : 8;
+
+  for (let h = startHour; h <= 21.5; h += 1.5) {
+    const hh = Math.floor(h);
+    const mm = h % 1 === 0.5 ? 30 : 0;
+    const timeStr = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    const slotStart = italyTime(date, timeStr);
+    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
+
+    const hasBooking = dayBookings.some(
+      (b) => new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,
+    );
+    const hasBlocked = dayBlocked.some(
+      (b) => new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,
+    );
+
+    if (!hasBooking && !hasBlocked) {
+      const endHH = Math.floor(h + 1.5);
+      const endMM = (h + 1.5) % 1 === 0.5 ? 30 : 0;
+      slots.push({
+        start: `${date}T${timeStr}`,
+        end: `${date}T${String(endHH).padStart(2, "0")}:${String(endMM).padStart(2, "0")}`,
+        duration: "1h30min",
+      });
+    }
+  }
+  res.json(slots);
+});
+
+// ── CALENDAR ──────────────────────────────────────────────────────
 app.get("/api/calendar", auth, async (req, res) => {
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 7);
@@ -528,44 +562,27 @@ app.get("/api/calendar", auth, async (req, res) => {
 
   const blockedEvents = blockedSlots
     .filter((s) => s.court)
-    .map((s) => {
-      const cfgMap = {
-        academy: {
-          color: { bg: "#3b82f6", border: "#2563eb" },
-          label: `🎓 ${s.note || "Academy"}`,
-        },
-        lesson: {
-          color: { bg: "#a855f7", border: "#9333ea" },
-          label: `👨‍🏫 ${s.note || "Lezione"}`,
-        },
-        blocked: {
-          color: { bg: "#6b7280", border: "#4b5563" },
-          label: `🔒 ${s.note || "Campo Bloccato"}`,
-        }, // ← grigio
-      };
-      const { color, label } = cfgMap[s.type] || {
-        color: { bg: "#ef4444", border: "#ca8a04" },
-        label: `🔒 ${s.note || "Campo Bloccato"}`,
-      };
-      return {
-        id: `blocked-${s._id}`,
-        title: label,
-        start: s.startTime,
-        end: s.endTime,
-        extendedProps: {
-          courtId: s.court._id.toString(),
-          type: s.type,
-          blockedSlotId: s._id.toString(),
-        },
-      };
-    });
+    .map((s) => ({
+      id: `blocked-${s._id}`,
+      title:
+        s.type === "academy"
+          ? `🎓 ${s.note || "Academy"}`
+          : s.type === "lesson"
+            ? `👨‍🏫 ${s.note || "Lezione"}`
+            : `🔒 ${s.note || "Campo Bloccato"}`,
+      start: s.startTime,
+      end: s.endTime,
+      extendedProps: {
+        courtId: s.court._id.toString(),
+        type: s.type,
+        blockedSlotId: s._id.toString(),
+      },
+    }));
 
   res.json([...bookingEvents, ...blockedEvents]);
 });
 
-// ══════════════════════════════════════════════════════════════════
-// STATS / DASHBOARD
-// ══════════════════════════════════════════════════════════════════
+// ── STATS ─────────────────────────────────────────────────────────
 app.get("/api/dashboard", auth, async (req, res) => {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const bookings = await Booking.find({
@@ -579,8 +596,7 @@ app.get("/api/dashboard", auth, async (req, res) => {
   res.json({ occupancy, totalBookings: bookings.length });
 });
 
-app.get("/api/admin/stats", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+app.get("/api/admin/stats", auth, adminOnly, async (req, res) => {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [stats, courtsStats] = await Promise.all([
     Booking.aggregate([
@@ -610,8 +626,7 @@ app.get("/api/admin/stats", auth, async (req, res) => {
   res.json({ stats, courtsStats });
 });
 
-app.get("/api/admin/report", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
+app.get("/api/admin/report", auth, adminOnly, async (req, res) => {
   const now = new Date();
   const month = parseInt(req.query.month) || now.getMonth() + 1;
   const year = parseInt(req.query.year) || now.getFullYear();
@@ -635,23 +650,26 @@ app.get("/api/admin/report", auth, async (req, res) => {
     const cs = blockedSlots.filter(
       (s) => s.court?._id.toString() === court._id.toString(),
     );
-    const hrs = (arr) =>
-      +(
-        arr.reduce(
-          (a, s) => a + (new Date(s.endTime) - new Date(s.startTime)) / 60000,
-          0,
-        ) / 60
-      ).toFixed(1);
-    const acad = cs.filter((s) => s.type === "academy");
-    const less = cs.filter((s) => s.type === "lesson");
+    const academySlots = cs.filter((s) => s.type === "academy");
+    const lessonSlots = cs.filter((s) => s.type === "lesson");
     return {
       courtName: court.name,
       bookings: cb.length,
-      revenue: cb.length * 40,
-      academyHours: hrs(acad),
-      lessonHours: hrs(less),
-      academySessions: acad.length,
-      lessonSessions: less.length,
+      revenue: cb.length * (config.slotPrice || 40),
+      academyHours: +(
+        academySlots.reduce(
+          (a, s) => a + (new Date(s.endTime) - new Date(s.startTime)) / 60000,
+          0,
+        ) / 60
+      ).toFixed(1),
+      lessonHours: +(
+        lessonSlots.reduce(
+          (a, s) => a + (new Date(s.endTime) - new Date(s.startTime)) / 60000,
+          0,
+        ) / 60
+      ).toFixed(1),
+      academySessions: academySlots.length,
+      lessonSessions: lessonSlots.length,
     };
   });
 
@@ -665,7 +683,7 @@ app.get("/api/admin/report", auth, async (req, res) => {
     month,
     year,
     totalBookings: bookings.length,
-    totalRevenue: bookings.length * 40,
+    totalRevenue: bookings.length * (config.slotPrice || 40),
     totalAcademyHours: +blockedSlots
       .filter((s) => s.type === "academy")
       .reduce(
@@ -685,133 +703,19 @@ app.get("/api/admin/report", auth, async (req, res) => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════
-// SPONSORS
-// ══════════════════════════════════════════════════════════════════
-app.get("/api/sponsors", async (req, res) => {
-  res.json(await Sponsor.find({ active: true }).sort({ order: 1 }));
-});
-
-app.post("/api/sponsors", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
-  const sponsor = new Sponsor(req.body);
-  await sponsor.save();
-  res.json(sponsor);
-});
-
-app.put("/api/sponsors/:id", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
-  const sponsor = await Sponsor.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-  });
-  res.json(sponsor);
-});
-
-app.delete("/api/sponsors/:id", auth, async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
-  await Sponsor.findByIdAndDelete(req.params.id);
-  res.json({ msg: "Sponsor rimosso" });
-});
-
-// ══════════════════════════════════════════════════════════════════
-// ADMIN PLAYERS
-// ══════════════════════════════════════════════════════════════════
-app.get("/api/admin/players", auth, async (req, res) => {
-  try {
-    if (!(await requireAdmin(req, res))) return;
-    const players = await Player.find().select("-password").sort({ name: 1 });
-    res.json(players);
-  } catch (err) {
-    res.status(500).json({ msg: "Errore server", error: err.message });
-  }
-});
-
-app.post("/api/admin/players", auth, async (req, res) => {
-  try {
-    if (!(await requireAdmin(req, res))) return;
-    const { name, surname, email, password, level, hand } = req.body;
-    if (!name) return res.status(400).json({ msg: "Nome obbligatorio" });
-
-    const finalEmail = email?.trim() || `guest_${Date.now()}@torneo.local`;
-    if (email?.trim()) {
-      const exists = await Player.findOne({ email: finalEmail });
-      if (exists) return res.status(400).json({ msg: "Email già registrata" });
-    }
-
-    const validLevels = ["principiante", "intermedio", "avanzato", "agonista"];
-    const finalLevel = validLevels.includes(level) ? level : "intermedio";
-    const hashed = await bcrypt.hash(
-      password || Math.random().toString(36).slice(-8),
-      10,
-    );
-
-    const newPlayer = new Player({
-      name: name.trim(),
-      surname: surname?.trim() || "", // ← AGGIUNGI
-      email: finalEmail,
-      password: hashed,
-      level: finalLevel,
-      hand: hand || "destra",
-      role: "player",
-    });
-    await newPlayer.save();
-    res.json(newPlayer);
-  } catch (err) {
-    console.error("❌ CREATE PLAYER ERROR:", err.message);
-    res
-      .status(500)
-      .json({ msg: "Errore creazione giocatore", error: err.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — CRUD base
-// ══════════════════════════════════════════════════════════════════
-//
-//
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — CRUD base
-// ══════════════════════════════════════════════════════════════════
-
-async function syncTournamentBlockedSlots(tournament) {
-  if (!tournament.courts?.length || !tournament.date) return;
-  await BlockedSlot.deleteMany({ tournamentId: tournament._id });
-  const dateStr = new Date(tournament.date).toISOString().slice(0, 10);
-  const start = new Date(`${dateStr}T${tournament.startTime || "09:00"}:00`);
-  const end = new Date(`${dateStr}T${tournament.endTime || "18:00"}:00`);
-  const slots = tournament.courts.map((courtId) => ({
-    court: courtId,
-    type: "blocked",
-    startTime: start,
-    endTime: end,
-    note: `🏆 Torneo: ${tournament.name}`,
-    tournamentId: tournament._id,
-  }));
-  await BlockedSlot.insertMany(slots);
-}
-
-app.get("/api/tournaments", auth, async (req, res) => {
-  try {
-    const tournaments = await Tournament.find()
-      .populate(T_POPULATE)
-      .sort({ date: -1 });
-    res.json(tournaments);
-  } catch (err) {
-    res.status(500).json({ msg: "Errore server", error: err.message });
-  }
-});
+// ── TORNEI — PUBLIC (DEVE STARE PRIMA DI /:id) ────────────────────
 app.get("/api/tournaments/public", async (req, res) => {
   try {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // ← inizio giornata, non ora esatta
+    today.setHours(0, 0, 0, 0);
     const tournaments = await Tournament.find({
       status: "open",
       date: { $gte: today },
     })
       .populate("courts")
-      .populate("couples.player1", "name")
-      .populate("couples.player2", "name")
-      .populate("players", "name")
+      .populate("players", "name surname")
+      .populate("couples.player1", "name surname")
+      .populate("couples.player2", "name surname")
       .sort({ date: 1 })
       .lean();
     res.json(tournaments);
@@ -820,23 +724,40 @@ app.get("/api/tournaments/public", async (req, res) => {
   }
 });
 
-app.get("/api/tournaments/:id", auth, async (req, res) => {
-  try {
-    const t = await Tournament.findById(req.params.id).populate(T_POPULATE);
-    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    res.json(t);
-  } catch (err) {
-    res.status(500).json({ msg: "Errore server" });
-  }
+// ── TORNEI — ADMIN ────────────────────────────────────────────────
+app.get("/api/tournaments", auth, async (req, res) => {
+  res.json(await Tournament.find().populate(T_POPULATE));
 });
 
-app.post("/api/tournaments", auth, async (req, res) => {
+app.post("/api/tournaments", auth, adminOnly, async (req, res) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
-    const t = new Tournament(req.body);
-    await t.save();
-    await syncTournamentBlockedSlots(t);
-    res.json(t);
+    const tournament = new Tournament(req.body);
+    await tournament.save();
+
+    // Se ha courts + startTime + endTime + date → crea i blocked slot automaticamente
+    if (
+      req.body.courts?.length &&
+      req.body.startTime &&
+      req.body.endTime &&
+      req.body.date
+    ) {
+      const dateStr = new Date(req.body.date).toISOString().slice(0, 10);
+      const start = italyTime(dateStr, req.body.startTime);
+      const end = italyTime(dateStr, req.body.endTime);
+      for (const courtId of req.body.courts) {
+        const slot = new BlockedSlot({
+          court: courtId,
+          type: "blocked",
+          startTime: start,
+          endTime: end,
+          note: `🏆 ${req.body.name}`,
+          tournamentId: tournament._id,
+        });
+        await slot.save();
+      }
+    }
+
+    res.json(await Tournament.findById(tournament._id).populate(T_POPULATE));
   } catch (err) {
     res
       .status(500)
@@ -844,96 +765,76 @@ app.post("/api/tournaments", auth, async (req, res) => {
   }
 });
 
-app.put("/api/tournaments/:id", auth, async (req, res) => {
+app.put("/api/tournaments/:id", auth, adminOnly, async (req, res) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
     const t = await Tournament.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     }).populate(T_POPULATE);
-    await syncTournamentBlockedSlots(t);
     res.json(t);
   } catch (err) {
-    res.status(500).json({ msg: "Errore modifica torneo" });
+    res
+      .status(500)
+      .json({ msg: "Errore aggiornamento torneo", error: err.message });
   }
 });
 
-app.delete("/api/tournaments/:id", auth, async (req, res) => {
+app.delete("/api/tournaments/:id", auth, adminOnly, async (req, res) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
-    await BlockedSlot.deleteMany({ tournamentId: req.params.id });
     await Tournament.findByIdAndDelete(req.params.id);
+    // Rimuovi anche i blocked slot associati
+    await BlockedSlot.deleteMany({ tournamentId: req.params.id });
     res.json({ msg: "Torneo eliminato" });
   } catch (err) {
-    res.status(500).json({ msg: "Errore eliminazione torneo" });
+    res
+      .status(500)
+      .json({ msg: "Errore eliminazione torneo", error: err.message });
   }
 });
 
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — GIOCATORI
-// ══════════════════════════════════════════════════════════════════
+// ── TORNEI — ISCRIZIONI ───────────────────────────────────────────
 app.post("/api/tournaments/:id/players", auth, async (req, res) => {
   try {
     const { playerId } = req.body;
     const t = await Tournament.findById(req.params.id);
     if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    if (!t.players.map((p) => p.toString()).includes(playerId))
-      t.players.push(playerId);
+    const pid = playerId || req.user.id;
+    if (!t.players.map((p) => p.toString()).includes(pid)) t.players.push(pid);
     await t.save();
     res.json(await Tournament.findById(t._id).populate(T_POPULATE));
   } catch (err) {
-    res
-      .status(500)
-      .json({ msg: "Errore aggiunta giocatore", error: err.message });
+    res.status(500).json({ msg: "Errore iscrizione", error: err.message });
   }
 });
 
-app.delete("/api/tournaments/:id/players/:playerId", auth, async (req, res) => {
-  try {
-    const t = await Tournament.findById(req.params.id);
-    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    t.players = t.players.filter((p) => p.toString() !== req.params.playerId);
-    await t.save();
-    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
-  } catch (err) {
-    res.status(500).json({ msg: "Errore rimozione giocatore" });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — COPPIE
-// ══════════════════════════════════════════════════════════════════
 app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
   try {
-    const { player1Id, player2Id, player2Guest, player2Name } = req.body;
+    const { player1Id, player2Id, player2Guest } = req.body;
     if (!player1Id)
       return res.status(400).json({ msg: "Giocatore 1 mancante" });
 
     const t = await Tournament.findById(req.params.id);
     if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
 
-    // Auto-aggiungi player1 alla lista players
     if (!t.players.map((p) => p.toString()).includes(player1Id))
       t.players.push(player1Id);
 
-    let coupleName;
     const p1Doc = await Player.findById(player1Id);
     const p1Name =
       [p1Doc?.name, p1Doc?.surname].filter(Boolean).join(" ") || "?";
 
-    // ── CASO 1: ospite senza registrazione ─────────────────────
+    // Caso ospite senza account
     if (player2Guest) {
-      coupleName = `${p1Name} / ${player2Guest} (ospite)`;
       t.couples.push({
         player1: player1Id,
         player2: null,
         guestName: player2Guest,
-        name: coupleName,
+        name: `${p1Name} / ${player2Guest} (ospite)`,
       });
       await t.save();
       return res.json(await Tournament.findById(t._id).populate(T_POPULATE));
     }
 
-    // ── CASO 2: cerca per ObjectId, email o nome ───────────────
+    // Cerca per ObjectId, email o nome
     let resolvedP2;
     if (player2Id?.match(/^[0-9a-fA-F]{24}$/)) {
       resolvedP2 = await Player.findById(player2Id);
@@ -942,15 +843,25 @@ app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
         $or: [
           { email: player2Id.trim().toLowerCase() },
           { name: { $regex: new RegExp(`^${player2Id.trim()}$`, "i") } },
+          {
+            $expr: {
+              $regexMatch: {
+                input: {
+                  $concat: ["$name", " ", { $ifNull: ["$surname", ""] }],
+                },
+                regex: player2Id.trim(),
+                options: "i",
+              },
+            },
+          },
         ],
       });
     }
 
     if (!resolvedP2)
-      return res.status(404).json({
-        msg: `Giocatore "${player2Id}" non trovato`,
-        notFound: true, // ← flag per il frontend
-      });
+      return res
+        .status(404)
+        .json({ msg: `Giocatore "${player2Id}" non trovato`, notFound: true });
 
     if (player1Id === resolvedP2._id.toString())
       return res.status(400).json({ msg: "I giocatori devono essere diversi" });
@@ -961,12 +872,10 @@ app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
     const p2Name = [resolvedP2.name, resolvedP2.surname]
       .filter(Boolean)
       .join(" ");
-    coupleName = `${p1Name} / ${p2Name}`;
-
     t.couples.push({
       player1: player1Id,
       player2: resolvedP2._id,
-      name: coupleName,
+      name: `${p1Name} / ${p2Name}`,
     });
     await t.save();
     res.json(await Tournament.findById(t._id).populate(T_POPULATE));
@@ -974,15 +883,13 @@ app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
     res.status(500).json({ msg: "Errore aggiunta coppia", error: err.message });
   }
 });
+
 app.post("/api/tournaments/:id/couples/register", auth, async (req, res) => {
   try {
     const { player1Id, newPlayer } = req.body;
-    // newPlayer = { name, email, level, hand }
-
     if (!newPlayer?.name || !newPlayer?.email)
       return res.status(400).json({ msg: "Nome e email obbligatori" });
 
-    // Controlla se esiste già
     const exists = await Player.findOne({
       email: newPlayer.email.trim().toLowerCase(),
     });
@@ -991,10 +898,8 @@ app.post("/api/tournaments/:id/couples/register", auth, async (req, res) => {
         .status(400)
         .json({ msg: "Email già registrata — cerca il giocatore per email" });
 
-    // Crea il nuovo giocatore con password casuale
     const tempPassword = Math.random().toString(36).slice(-8);
     const hashed = await bcrypt.hash(tempPassword, 10);
-
     const newP = new Player({
       name: newPlayer.name.trim(),
       surname: newPlayer.surname?.trim() || "",
@@ -1006,7 +911,6 @@ app.post("/api/tournaments/:id/couples/register", auth, async (req, res) => {
     });
     await newP.save();
 
-    // Aggiungi coppia al torneo
     const t = await Tournament.findById(req.params.id);
     if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
 
@@ -1042,287 +946,50 @@ app.post("/api/tournaments/:id/couples/register", auth, async (req, res) => {
   }
 });
 
-app.delete("/api/tournaments/:id/couples/:coupleId", auth, async (req, res) => {
-  try {
-    const t = await Tournament.findById(req.params.id);
-    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    t.couples.pull({ _id: req.params.coupleId });
-    await t.save();
-    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
-  } catch (err) {
-    res.status(500).json({ msg: "Errore rimozione coppia" });
-  }
-});
-
-// Toggle testa di serie
-app.patch(
-  "/api/tournaments/:id/couples/:coupleId/seed",
-  auth,
-  async (req, res) => {
-    try {
-      if (!(await requireAdmin(req, res))) return;
-      const t = await Tournament.findById(req.params.id);
-      if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-      const couple = t.couples.id(req.params.coupleId);
-      if (!couple) return res.status(404).json({ msg: "Coppia non trovata" });
-      couple.seeded = req.body.seeded ?? !couple.seeded;
-      await t.save();
-      res.json(await Tournament.findById(t._id).populate(T_POPULATE));
-    } catch (err) {
-      res.status(500).json({ msg: "Errore aggiornamento seed" });
-    }
-  },
-);
-
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — MATCH (risultati)
-// ══════════════════════════════════════════════════════════════════
-app.put("/api/tournaments/:id/matches/:matchId", auth, async (req, res) => {
-  try {
-    const t = await Tournament.findById(req.params.id);
-    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    const match = t.matches.id(req.params.matchId);
-    if (!match) return res.status(404).json({ msg: "Match non trovato" });
-
-    if (req.body.score !== undefined) match.score = req.body.score;
-    if (req.body.winner !== undefined) match.winner = req.body.winner;
-    if (req.body.couple1 !== undefined) match.couple1 = req.body.couple1;
-    if (req.body.couple2 !== undefined) match.couple2 = req.body.couple2;
-    if (req.body.court !== undefined) match.court = req.body.court;
-    if (req.body.time !== undefined) match.time = req.body.time;
-
-    // Se match di girone completato → prova ad avanzare al bracket
-    if (match.phase === "group" && match.winner) {
-      advanceBracket(t);
-    }
-    // Se match di bracket completato → avanza il vincitore al turno successivo
-    if ((match.phase === "gold" || match.phase === "silver") && match.winner) {
-      advanceBracketWinner(t, match);
-    }
-
-    await t.save();
-    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
-  } catch (err) {
-    res
-      .status(500)
-      .json({ msg: "Errore aggiornamento match", error: err.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════
-// TOURNAMENTS — GENERA TABELLONE
-// ══════════════════════════════════════════════════════════════════
-app.post("/api/tournaments/:id/draw", auth, async (req, res) => {
-  try {
-    if (!(await requireAdmin(req, res))) return;
-    const t = await Tournament.findById(req.params.id);
-    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
-    if (t.couples.length < 3)
-      return res.status(400).json({ msg: "Servono almeno 3 coppie" });
-
-    // ── 1. Separa seeds e non-seeds ──────────────────────────────
-    const seeded = t.couples.filter((c) => c.seeded);
-    const nonSeeded = shuffle(t.couples.filter((c) => !c.seeded));
-
-    // ── 2. Calcola numero e dimensione gironi ────────────────────
-    const total = t.couples.length;
-    let numGroups;
-    if (total % 4 === 0)
-      numGroups = total / 4; // tutti da 4
-    else if (total % 3 === 0)
-      numGroups = total / 3; // tutti da 3
-    else numGroups = Math.ceil(total / 4); // misto
-
-    // ── 3. Crea gironi e distribuisci seeds (uno per girone) ─────
-    const groups = Array.from({ length: numGroups }, (_, i) => ({
-      number: i + 1,
-      couples: [],
-    }));
-    seeded.forEach((c, i) => {
-      groups[i % numGroups].couples.push(c._id);
-    });
-
-    // Distribuisci i non-seeded riempiendo i gironi con meno coppie
-    for (const c of nonSeeded) {
-      const minLen = Math.min(...groups.map((g) => g.couples.length));
-      const target = groups.find((g) => g.couples.length === minLen);
-      target.couples.push(c._id);
-    }
-
-    // ── 4. Genera match round-robin per ogni girone ──────────────
-    const groupMatches = [];
-    for (const group of groups) {
-      const cs = group.couples;
-      for (let i = 0; i < cs.length; i++) {
-        for (let j = i + 1; j < cs.length; j++) {
-          groupMatches.push({
-            couple1: cs[i],
-            couple2: cs[j],
-            phase: "group",
-            group: group.number,
-            score: "",
-          });
-        }
-      }
-    }
-
-    // ── 5. Genera placeholder bracket Gold e Silver ──────────────
-    // Gold: numGroups * 2 qualificate (prime 2 per girone)
-    // Silver: numGroups qualificate (terze)
-    const goldMatches = generateEmptyBracket("gold", numGroups * 2);
-    const silverMatches = generateEmptyBracket("silver", numGroups);
-
-    // ── 6. Salva ─────────────────────────────────────────────────
-    t.groups = groups;
-    t.matches = [...groupMatches, ...goldMatches, ...silverMatches];
-    t.status = "running";
-    await t.save();
-
-    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
-  } catch (err) {
-    console.error("❌ DRAW ERROR:", err);
-    res
-      .status(500)
-      .json({ msg: "Errore generazione tabellone", error: err.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════
-// UTILITY — Generazione bracket e avanzamento
-// ══════════════════════════════════════════════════════════════════
-
-function generateEmptyBracket(phase, numTeams) {
-  if (numTeams < 2) return [];
-  const slots = nextPowerOf2(numTeams);
-  const rounds = Math.log2(slots);
-  const labels = { 1: "F", 2: "SF", 4: "QF", 8: "R16", 16: "R32" };
+app.post("/api/tournaments/:id/pair", auth, adminOnly, async (req, res) => {
+  const tournament = await Tournament.findById(req.params.id).populate(
+    "players",
+  );
+  const sorted = tournament.players.sort((a, b) => {
+    const levels = { agonista: 3, avanzato: 2, intermedio: 1, principiante: 0 };
+    return levels[b.level] - levels[a.level];
+  });
   const matches = [];
-  for (let r = 1; r <= rounds; r++) {
-    const matchesInRound = slots / Math.pow(2, r);
-    const label = labels[matchesInRound] || `R${matchesInRound * 2}`;
-    for (let m = 0; m < matchesInRound; m++) {
-      matches.push({
-        couple1: null,
-        couple2: null,
-        phase,
-        round: label,
-        score: "",
-      });
-    }
+  for (let i = 0; i < sorted.length; i += 2) {
+    if (sorted[i + 1])
+      matches.push({ player1: sorted[i]._id, player2: sorted[i + 1]._id });
   }
-  return matches;
-}
+  tournament.matches = matches;
+  tournament.status = "running";
+  await tournament.save();
+  res.json({ matches });
+});
 
-function advanceBracket(t) {
-  // Controlla se tutti i match di girone sono completati
-  const groupNums = [
-    ...new Set(
-      t.matches.filter((m) => m.phase === "group").map((m) => m.group),
-    ),
-  ];
-  const allDone = groupNums.every((gNum) =>
-    t.matches
-      .filter((m) => m.phase === "group" && m.group === gNum)
-      .every((m) => m.winner),
-  );
-  if (!allDone) return;
+// ── SPONSORS ──────────────────────────────────────────────────────
+app.get("/api/sponsors", async (req, res) => {
+  res.json(await Sponsor.find({ active: true }).sort({ order: 1 }));
+});
 
-  // Calcola classifica per ogni girone
-  const rankings = {};
-  for (const gNum of groupNums) {
-    const gCouples = t.groups.find((g) => g.number === gNum)?.couples || [];
-    const stats = {};
-    gCouples.forEach((id) => {
-      stats[id.toString()] = { id, wins: 0, losses: 0 };
-    });
-    t.matches
-      .filter((m) => m.phase === "group" && m.group === gNum && m.winner)
-      .forEach((m) => {
-        const w = m.winner.toString();
-        const l =
-          m.couple1.toString() === w
-            ? m.couple2.toString()
-            : m.couple1.toString();
-        if (stats[w]) stats[w].wins++;
-        if (stats[l]) stats[l].losses++;
-      });
-    rankings[gNum] = Object.values(stats).sort(
-      (a, b) => b.wins - a.wins || a.losses - b.losses,
-    );
-  }
+app.post("/api/sponsors", auth, adminOnly, async (req, res) => {
+  const sponsor = new Sponsor(req.body);
+  await sponsor.save();
+  res.json(sponsor);
+});
 
-  // Popola Gold con prime 2 di ogni girone, Silver con le terze
-  const goldTeams = [
-    ...groupNums.map((g) => rankings[g][0]?.id),
-    ...groupNums.map((g) => rankings[g][1]?.id),
-  ].filter(Boolean);
-  const silverTeams = groupNums.map((g) => rankings[g][2]?.id).filter(Boolean);
+app.put("/api/sponsors/:id", auth, adminOnly, async (req, res) => {
+  const sponsor = await Sponsor.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+  });
+  res.json(sponsor);
+});
 
-  fillFirstRound(t, "gold", goldTeams);
-  fillFirstRound(t, "silver", silverTeams);
-}
+app.delete("/api/sponsors/:id", auth, adminOnly, async (req, res) => {
+  await Sponsor.findByIdAndDelete(req.params.id);
+  res.json({ msg: "Sponsor rimosso" });
+});
 
-function fillFirstRound(t, phase, teams) {
-  const ROUND_ORDER = { R32: 0, R16: 1, QF: 2, SF: 3, F: 4 };
-  const phaseMatches = t.matches.filter((m) => m.phase === phase);
-  if (!phaseMatches.length) return;
-  const firstRoundLabel = phaseMatches
-    .map((m) => m.round)
-    .sort((a, b) => (ROUND_ORDER[a] ?? 5) - (ROUND_ORDER[b] ?? 5))[0];
-
-  const firstRoundMatches = phaseMatches.filter(
-    (m) => m.round === firstRoundLabel,
-  );
-  for (let i = 0; i < firstRoundMatches.length; i++) {
-    firstRoundMatches[i].couple1 = teams[i * 2] || null;
-    firstRoundMatches[i].couple2 = teams[i * 2 + 1] || null;
-  }
-}
-
-function advanceBracketWinner(t, completedMatch) {
-  const phase = completedMatch.phase;
-  const ROUND_ORDER = { R32: 0, R16: 1, QF: 2, SF: 3, F: 4 };
-  const phaseMatches = t.matches.filter((m) => m.phase === phase);
-
-  // Trova il round successivo
-  const rounds = [...new Set(phaseMatches.map((m) => m.round))].sort(
-    (a, b) => (ROUND_ORDER[a] ?? 5) - (ROUND_ORDER[b] ?? 5),
-  );
-  const currentRoundIdx = rounds.indexOf(completedMatch.round);
-  if (currentRoundIdx === -1 || currentRoundIdx === rounds.length - 1) return; // È la finale
-
-  const currentRound = rounds[currentRoundIdx];
-  const nextRound = rounds[currentRoundIdx + 1];
-  const currentMatches = phaseMatches.filter((m) => m.round === currentRound);
-  const nextMatches = phaseMatches.filter((m) => m.round === nextRound);
-
-  // Controlla se tutti i match del round corrente sono completati
-  if (!currentMatches.every((m) => m.winner)) return;
-
-  // Mappa i vincitori nel round successivo
-  const winners = currentMatches.map((m) => m.winner);
-  for (let i = 0; i < nextMatches.length; i++) {
-    nextMatches[i].couple1 = winners[i * 2] || null;
-    nextMatches[i].couple2 = winners[i * 2 + 1] || null;
-  }
-}
-
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function nextPowerOf2(n) {
-  let p = 1;
-  while (p < n) p *= 2;
-  return p;
-}
-
-// ══════════════════════════════════════════════════════════════════
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`🚀 Server running on port ${PORT}`),
-);
+// ── START ─────────────────────────────────────────────────────────
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`✅ Routes: tournaments/public ✓ admin/players ✓ timezone fix ✓`);
+});
