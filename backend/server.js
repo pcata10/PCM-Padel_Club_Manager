@@ -107,9 +107,6 @@ const T_POPULATE = [
   { path: "courts" },
   { path: "couples.player1" },
   { path: "couples.player2" },
-  { path: "matches.couple1" },
-  { path: "matches.couple2" },
-  { path: "matches.winner" },
 ];
 
 // ══════════════════════════════════════════════════════════════════
@@ -541,6 +538,10 @@ app.get("/api/calendar", auth, async (req, res) => {
           color: { bg: "#a855f7", border: "#9333ea" },
           label: `👨‍🏫 ${s.note || "Lezione"}`,
         },
+        blocked: {
+          color: { bg: "#6b7280", border: "#4b5563" },
+          label: `🔒 ${s.note || "Campo Bloccato"}`,
+        }, // ← grigio
       };
       const { color, label } = cfgMap[s.type] || {
         color: { bg: "#ef4444", border: "#ca8a04" },
@@ -728,10 +729,7 @@ app.get("/api/admin/players", auth, async (req, res) => {
 app.post("/api/admin/players", auth, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
-    const { name, email, password, level, hand } = req.body;
-
-    console.log("📥 Body ricevuto:", req.body); // ← aggiungi questo
-
+    const { name, surname, email, password, level, hand } = req.body;
     if (!name) return res.status(400).json({ msg: "Nome obbligatorio" });
 
     const finalEmail = email?.trim() || `guest_${Date.now()}@torneo.local`;
@@ -742,28 +740,24 @@ app.post("/api/admin/players", auth, async (req, res) => {
 
     const validLevels = ["principiante", "intermedio", "avanzato", "agonista"];
     const finalLevel = validLevels.includes(level) ? level : "intermedio";
-
     const hashed = await bcrypt.hash(
       password || Math.random().toString(36).slice(-8),
       10,
     );
+
     const newPlayer = new Player({
       name: name.trim(),
+      surname: surname?.trim() || "", // ← AGGIUNGI
       email: finalEmail,
       password: hashed,
       level: finalLevel,
       hand: hand || "destra",
       role: "player",
     });
-
-    console.log("💾 Player da salvare:", newPlayer); // ← aggiungi questo
-
     await newPlayer.save();
     res.json(newPlayer);
   } catch (err) {
-    // ← questo è il log più importante
     console.error("❌ CREATE PLAYER ERROR:", err.message);
-    console.error("❌ FULL ERROR:", JSON.stringify(err, null, 2));
     res
       .status(500)
       .json({ msg: "Errore creazione giocatore", error: err.message });
@@ -773,6 +767,29 @@ app.post("/api/admin/players", auth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 // TOURNAMENTS — CRUD base
 // ══════════════════════════════════════════════════════════════════
+//
+//
+// ══════════════════════════════════════════════════════════════════
+// TOURNAMENTS — CRUD base
+// ══════════════════════════════════════════════════════════════════
+
+async function syncTournamentBlockedSlots(tournament) {
+  if (!tournament.courts?.length || !tournament.date) return;
+  await BlockedSlot.deleteMany({ tournamentId: tournament._id });
+  const dateStr = new Date(tournament.date).toISOString().slice(0, 10);
+  const start = new Date(`${dateStr}T${tournament.startTime || "09:00"}:00`);
+  const end = new Date(`${dateStr}T${tournament.endTime || "18:00"}:00`);
+  const slots = tournament.courts.map((courtId) => ({
+    court: courtId,
+    type: "blocked",
+    startTime: start,
+    endTime: end,
+    note: `🏆 Torneo: ${tournament.name}`,
+    tournamentId: tournament._id,
+  }));
+  await BlockedSlot.insertMany(slots);
+}
+
 app.get("/api/tournaments", auth, async (req, res) => {
   try {
     const tournaments = await Tournament.find()
@@ -781,6 +798,25 @@ app.get("/api/tournaments", auth, async (req, res) => {
     res.json(tournaments);
   } catch (err) {
     res.status(500).json({ msg: "Errore server", error: err.message });
+  }
+});
+app.get("/api/tournaments/public", async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // ← inizio giornata, non ora esatta
+    const tournaments = await Tournament.find({
+      status: "open",
+      date: { $gte: today },
+    })
+      .populate("courts")
+      .populate("couples.player1", "name")
+      .populate("couples.player2", "name")
+      .populate("players", "name")
+      .sort({ date: 1 })
+      .lean();
+    res.json(tournaments);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore", error: err.message });
   }
 });
 
@@ -799,6 +835,7 @@ app.post("/api/tournaments", auth, async (req, res) => {
     if (!(await requireAdmin(req, res))) return;
     const t = new Tournament(req.body);
     await t.save();
+    await syncTournamentBlockedSlots(t);
     res.json(t);
   } catch (err) {
     res
@@ -813,6 +850,7 @@ app.put("/api/tournaments/:id", auth, async (req, res) => {
     const t = await Tournament.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     }).populate(T_POPULATE);
+    await syncTournamentBlockedSlots(t);
     res.json(t);
   } catch (err) {
     res.status(500).json({ msg: "Errore modifica torneo" });
@@ -822,6 +860,7 @@ app.put("/api/tournaments/:id", auth, async (req, res) => {
 app.delete("/api/tournaments/:id", auth, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
+    await BlockedSlot.deleteMany({ tournamentId: req.params.id });
     await Tournament.findByIdAndDelete(req.params.id);
     res.json({ msg: "Torneo eliminato" });
   } catch (err) {
@@ -865,40 +904,141 @@ app.delete("/api/tournaments/:id/players/:playerId", auth, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
   try {
-    const { player1Id, player2Id, name } = req.body;
-    if (!player1Id || !player2Id)
-      return res.status(400).json({ msg: "Servono due giocatori" });
-    if (player1Id === player2Id)
-      return res.status(400).json({ msg: "I giocatori devono essere diversi" });
+    const { player1Id, player2Id, player2Guest, player2Name } = req.body;
+    if (!player1Id)
+      return res.status(400).json({ msg: "Giocatore 1 mancante" });
 
     const t = await Tournament.findById(req.params.id);
     if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
 
-    // Auto-aggiungi i giocatori alla lista players del torneo
+    // Auto-aggiungi player1 alla lista players
     if (!t.players.map((p) => p.toString()).includes(player1Id))
       t.players.push(player1Id);
-    if (!t.players.map((p) => p.toString()).includes(player2Id))
-      t.players.push(player2Id);
 
-    // Nome automatico se non fornito
-    let coupleName = name?.trim();
-    if (!coupleName) {
-      const [p1, p2] = await Promise.all([
-        Player.findById(player1Id),
-        Player.findById(player2Id),
-      ]);
-      coupleName = `${p1?.name || "?"} / ${p2?.name || "?"}`;
+    let coupleName;
+    const p1Doc = await Player.findById(player1Id);
+    const p1Name =
+      [p1Doc?.name, p1Doc?.surname].filter(Boolean).join(" ") || "?";
+
+    // ── CASO 1: ospite senza registrazione ─────────────────────
+    if (player2Guest) {
+      coupleName = `${p1Name} / ${player2Guest} (ospite)`;
+      t.couples.push({
+        player1: player1Id,
+        player2: null,
+        guestName: player2Guest,
+        name: coupleName,
+      });
+      await t.save();
+      return res.json(await Tournament.findById(t._id).populate(T_POPULATE));
     }
+
+    // ── CASO 2: cerca per ObjectId, email o nome ───────────────
+    let resolvedP2;
+    if (player2Id?.match(/^[0-9a-fA-F]{24}$/)) {
+      resolvedP2 = await Player.findById(player2Id);
+    } else if (player2Id) {
+      resolvedP2 = await Player.findOne({
+        $or: [
+          { email: player2Id.trim().toLowerCase() },
+          { name: { $regex: new RegExp(`^${player2Id.trim()}$`, "i") } },
+        ],
+      });
+    }
+
+    if (!resolvedP2)
+      return res.status(404).json({
+        msg: `Giocatore "${player2Id}" non trovato`,
+        notFound: true, // ← flag per il frontend
+      });
+
+    if (player1Id === resolvedP2._id.toString())
+      return res.status(400).json({ msg: "I giocatori devono essere diversi" });
+
+    if (!t.players.map((p) => p.toString()).includes(resolvedP2._id.toString()))
+      t.players.push(resolvedP2._id);
+
+    const p2Name = [resolvedP2.name, resolvedP2.surname]
+      .filter(Boolean)
+      .join(" ");
+    coupleName = `${p1Name} / ${p2Name}`;
 
     t.couples.push({
       player1: player1Id,
-      player2: player2Id,
+      player2: resolvedP2._id,
       name: coupleName,
     });
     await t.save();
     res.json(await Tournament.findById(t._id).populate(T_POPULATE));
   } catch (err) {
     res.status(500).json({ msg: "Errore aggiunta coppia", error: err.message });
+  }
+});
+app.post("/api/tournaments/:id/couples/register", auth, async (req, res) => {
+  try {
+    const { player1Id, newPlayer } = req.body;
+    // newPlayer = { name, email, level, hand }
+
+    if (!newPlayer?.name || !newPlayer?.email)
+      return res.status(400).json({ msg: "Nome e email obbligatori" });
+
+    // Controlla se esiste già
+    const exists = await Player.findOne({
+      email: newPlayer.email.trim().toLowerCase(),
+    });
+    if (exists)
+      return res
+        .status(400)
+        .json({ msg: "Email già registrata — cerca il giocatore per email" });
+
+    // Crea il nuovo giocatore con password casuale
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashed = await bcrypt.hash(tempPassword, 10);
+
+    const newP = new Player({
+      name: newPlayer.name.trim(),
+      surname: newPlayer.surname?.trim() || "",
+      email: newPlayer.email.trim().toLowerCase(),
+      password: hashed,
+      level: newPlayer.level || "intermedio",
+      hand: newPlayer.hand || "destra",
+      role: "player",
+    });
+    await newP.save();
+
+    // Aggiungi coppia al torneo
+    const t = await Tournament.findById(req.params.id);
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+
+    if (!t.players.map((p) => p.toString()).includes(player1Id))
+      t.players.push(player1Id);
+    t.players.push(newP._id);
+
+    const p1Doc = await Player.findById(player1Id);
+    const p1Name =
+      [p1Doc?.name, p1Doc?.surname].filter(Boolean).join(" ") || "?";
+    const p2Name = [newP.name, newP.surname].filter(Boolean).join(" ");
+
+    t.couples.push({
+      player1: player1Id,
+      player2: newP._id,
+      name: `${p1Name} / ${p2Name}`,
+    });
+    await t.save();
+
+    res.json({
+      tournament: await Tournament.findById(t._id).populate(T_POPULATE),
+      newPlayer: {
+        id: newP._id,
+        name: p2Name,
+        email: newP.email,
+        tempPassword,
+      },
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ msg: "Errore registrazione partner", error: err.message });
   }
 });
 

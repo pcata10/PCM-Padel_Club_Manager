@@ -31,11 +31,10 @@ const STATUS_CFG = {
   },
 };
 const LEVEL_CFG = {
-  open: { label: "Open", badge: "bg-blue-100 text-blue-700" },
   intermedio: { label: "Intermedio", badge: "bg-orange-100 text-orange-700" },
   agonista: { label: "Agonista", badge: "bg-red-100 text-red-700" },
 };
-const ROUND_ORDER = { F: 0, SF: 1, QF: 2, R16: 3, R32: 4 };
+const ROUND_ORDER = { R32: 0, R16: 1, QF: 2, SF: 3, F: 4 };
 const ROUND_LABEL = {
   F: "🏆 Finale",
   SF: "Semifinale",
@@ -43,6 +42,7 @@ const ROUND_LABEL = {
   R16: "Ottavi",
   R32: "Sedicesimi",
 };
+
 const EMPTY_FORM = {
   name: "",
   date: "",
@@ -52,13 +52,21 @@ const EMPTY_FORM = {
   level: "intermedio",
   status: "open",
 };
+const EMPTY_NEW_PLAYER = {
+  name: "",
+  surname: "",
+  email: "",
+  level: "intermedio",
+  hand: "destra",
+};
+
 const TABS = [
   { id: "couples", label: "🤝 Coppie" },
   { id: "players", label: "👤 Giocatori" },
   { id: "draw", label: "🏆 Tabellone" },
 ];
 
-// ── Helper components ────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────
 function Badge({ className, children }) {
   return (
     <span
@@ -79,10 +87,38 @@ function EmptyState({ icon, title, sub }) {
   );
 }
 
-// ── Bracket colonna per round ────────────────────────────────────
+// Mostra "Cognome1 / Cognome2" se disponibili, altrimenti il nome coppia
+function coupleShortName(couple) {
+  if (!couple) return "?";
+  const s1 = couple.player1?.surname?.trim();
+  const s2 = couple.player2?.surname?.trim();
+  if (s1 && s2) return `${s1} / ${s2}`;
+  // fallback: primo token del nome coppia (es. "Marco Rossi / Luigi Verdi" → "Rossi / Verdi")
+  if (couple.name) {
+    const parts = couple.name.split("/").map((p) => p.trim().split(" ").pop());
+    if (parts.length === 2) return parts.join(" / ");
+    return couple.name;
+  }
+  return "?";
+}
+
+// Nome completo per liste e modal
+function coupleFullName(couple) {
+  if (!couple) return "?";
+  if (couple.name) return couple.name;
+  const n1 = [couple.player1?.name, couple.player1?.surname]
+    .filter(Boolean)
+    .join(" ");
+  const n2 = [couple.player2?.name, couple.player2?.surname]
+    .filter(Boolean)
+    .join(" ");
+  return n1 && n2 ? `${n1} / ${n2}` : "?";
+}
+
+// ── BracketColumn ────────────────────────────────────────────────
 function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
   return (
-    <div className="flex flex-col gap-3 min-w-[210px]">
+    <div className="flex flex-col gap-3 min-w-[180px]">
       <div
         className={`text-center text-xs font-bold py-1.5 rounded-xl text-white ${
           phase === "gold"
@@ -112,7 +148,7 @@ function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
             {[c1, c2].map((c, i) => (
               <div
                 key={i}
-                className={`px-3 py-2 text-xs font-semibold flex items-center justify-between
+                className={`px-3 py-2 text-xs font-bold flex items-center justify-between
                   ${i === 0 ? "border-b border-gray-100" : ""}
                   ${
                     m.winner?.toString() === c?._id?.toString()
@@ -123,19 +159,18 @@ function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
                   }
                 `}
               >
-                <span className="truncate max-w-[130px]">
+                <span className="truncate">
                   {c ? (
-                    c.seeded ? (
-                      `⭐ ${c.name}`
-                    ) : (
-                      c.name
-                    )
+                    <>
+                      {c.seeded && <span className="mr-0.5">⭐</span>}
+                      {coupleShortName(c)}
+                    </>
                   ) : (
-                    <em className="text-gray-300">In attesa</em>
+                    <em className="text-gray-300 font-normal">In attesa</em>
                   )}
                 </span>
                 {m.winner?.toString() === c?._id?.toString() && (
-                  <span className="ml-1 shrink-0">✓</span>
+                  <span className="ml-1 shrink-0 text-green-500">✓</span>
                 )}
               </div>
             ))}
@@ -151,11 +186,11 @@ function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
   );
 }
 
-// ── Bracket section (Gold / Silver) ─────────────────────────────
+// ── BracketSection ───────────────────────────────────────────────
 function BracketSection({ phase, matches, couples, onMatchClick }) {
   if (!matches.length) return null;
   const rounds = [...new Set(matches.map((m) => m.round))].sort(
-    (a, b) => (ROUND_ORDER[b] ?? 9) - (ROUND_ORDER[a] ?? 9),
+    (a, b) => (ROUND_ORDER[a] ?? 9) - (ROUND_ORDER[b] ?? 9),
   );
 
   const isGold = phase === "gold";
@@ -166,7 +201,8 @@ function BracketSection({ phase, matches, couples, onMatchClick }) {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <span
-          className={`w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold ${isGold ? "bg-amber-500" : "bg-slate-400"}`}
+          className={`w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold
+          ${isGold ? "bg-amber-500" : "bg-slate-400"}`}
         >
           {isGold ? "2" : "3"}
         </span>
@@ -200,42 +236,34 @@ export default function AdminTournaments() {
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // torneo selezionato / tab
   const [selectedT, setSelectedT] = useState(null);
   const [activeTab, setActiveTab] = useState("couples");
 
-  // form crea/modifica torneo
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   // modal giocatore
-  const [playerModal, setPlayerModal] = useState(null); // tournamentId
-  const [playerTab, setPlayerTab] = useState("search"); // "search" | "new"
+  const [playerModal, setPlayerModal] = useState(null);
+  const [playerTab, setPlayerTab] = useState("search");
   const [playerSearch, setPlayerSearch] = useState("");
-  const [newPlayerForm, setNewPlayerForm] = useState({
-    name: "",
-    email: "",
-    level: "open",
-    hand: "destra",
-  });
+  const [newPlayerForm, setNewPlayerForm] = useState(EMPTY_NEW_PLAYER);
 
   // modal coppia
-  const [coupleModal, setCoupleModal] = useState(null); // tournamentId
+  const [coupleModal, setCoupleModal] = useState(null);
   const [coupleForm, setCoupleForm] = useState({
     player1Id: "",
     player2Id: "",
     name: "",
   });
 
-  // modal risultato match
-  const [scoreModal, setScoreModal] = useState(null); // { matchId, tournamentId, c1, c2 }
+  // modal risultato
+  const [scoreModal, setScoreModal] = useState(null);
   const [scoreForm, setScoreForm] = useState({ score: "", winner: "" });
 
-  // tabellone
   const [drawLoading, setDrawLoading] = useState(false);
 
-  // ── Fetch ──────────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -264,7 +292,7 @@ export default function AdminTournaments() {
     fetchAll();
   }, []);
 
-  // ── Torneo CRUD ────────────────────────────────────────────────
+  // ── Torneo CRUD ──────────────────────────────────────────────
   const saveTournament = async () => {
     if (!form.name || !form.date) return alert("Nome e data obbligatori");
     try {
@@ -302,13 +330,13 @@ export default function AdminTournaments() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ── Giocatori ──────────────────────────────────────────────────
+  // ── Giocatori ────────────────────────────────────────────────
   const addRegisteredPlayer = async (tid, playerId) => {
     try {
       await api.post(`/api/tournaments/${tid}/players`, { playerId });
       await refreshT(tid);
     } catch (err) {
-      alert(err.response?.data?.msg || "Errore");
+      alert(err.response?.data?.msg || "Errore aggiunta giocatore");
     }
   };
 
@@ -316,7 +344,11 @@ export default function AdminTournaments() {
     if (!newPlayerForm.name) return alert("Nome obbligatorio");
     try {
       const res = await api.post("/api/admin/players", {
-        ...newPlayerForm,
+        name: newPlayerForm.name.trim(),
+        surname: newPlayerForm.surname.trim(),
+        email: newPlayerForm.email.trim() || undefined,
+        level: newPlayerForm.level,
+        hand: newPlayerForm.hand,
         password: Math.random().toString(36).slice(-8),
       });
       await api.post(`/api/tournaments/${tid}/players`, {
@@ -324,7 +356,7 @@ export default function AdminTournaments() {
       });
       await fetchAll();
       await refreshT(tid);
-      setNewPlayerForm({ name: "", email: "", level: "open", hand: "destra" });
+      setNewPlayerForm(EMPTY_NEW_PLAYER);
       setPlayerTab("search");
     } catch (err) {
       alert(err.response?.data?.msg || "Errore creazione giocatore");
@@ -392,7 +424,7 @@ export default function AdminTournaments() {
     }
   };
 
-  // ── Risultati match ────────────────────────────────────────────
+  // ── Risultati ─────────────────────────────────────────────────
   const saveScore = async () => {
     if (!scoreForm.winner) return alert("Seleziona il vincitore");
     try {
@@ -408,7 +440,7 @@ export default function AdminTournaments() {
     }
   };
 
-  // ── Helpers ────────────────────────────────────────────────────
+  // ── Helpers locali ────────────────────────────────────────────
   const tPlayers = (t) =>
     (t?.players || [])
       .map((p) =>
@@ -417,16 +449,25 @@ export default function AdminTournaments() {
       .filter(Boolean);
 
   const filteredPlayers = allPlayers.filter((p) =>
-    `${p.name} ${p.email}`.toLowerCase().includes(playerSearch.toLowerCase()),
+    `${p.name} ${p.surname || ""} ${p.email}`
+      .toLowerCase()
+      .includes(playerSearch.toLowerCase()),
   );
+
+  const playerDisplayName = (p) =>
+    [p.name, p.surname].filter(Boolean).join(" ");
 
   const groupRanking = (t, groupNum) => {
     const group = t.groups?.find((g) => g.number === groupNum);
     if (!group) return [];
-    const gIds = group.couples.map((id) => id?.toString());
     const stats = {};
-    gIds.forEach((id) => {
-      stats[id] = { id, wins: 0, losses: 0, played: 0 };
+    group.couples.forEach((id) => {
+      stats[id?.toString()] = {
+        id: id?.toString(),
+        wins: 0,
+        losses: 0,
+        played: 0,
+      };
     });
     t.matches
       .filter((m) => m.phase === "group" && m.group === groupNum && m.winner)
@@ -453,7 +494,7 @@ export default function AdminTournaments() {
       }));
   };
 
-  // ══════════════════════════════════════════════════════════════
+  // ── Loading ───────────────────────────────────────────────────
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-700 to-slate-500">
@@ -483,7 +524,7 @@ export default function AdminTournaments() {
         </div>
 
         {/* ══════════════════════════════════════════════════════
-            FORM CREA / MODIFICA
+            FORM CREA / MODIFICA TORNEO
         ══════════════════════════════════════════════════════ */}
         {showForm && (
           <div className="bg-white/95 rounded-3xl shadow-xl p-6 space-y-5">
@@ -559,7 +600,6 @@ export default function AdminTournaments() {
                   onChange={(e) => setForm({ ...form, level: e.target.value })}
                   className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm"
                 >
-                  <option value="open">Open</option>
                   <option value="intermedio">Intermedio</option>
                   <option value="agonista">Agonista</option>
                 </select>
@@ -650,7 +690,9 @@ export default function AdminTournaments() {
               return (
                 <div
                   key={t._id}
-                  className={`bg-white/95 rounded-3xl shadow-lg overflow-hidden transition-all ${isOpen ? "ring-2 ring-emerald-400" : ""}`}
+                  className={`bg-white/95 rounded-3xl shadow-lg overflow-hidden transition-all ${
+                    isOpen ? "ring-2 ring-emerald-400" : ""
+                  }`}
                 >
                   {/* ── Card header ── */}
                   <div
@@ -660,14 +702,18 @@ export default function AdminTournaments() {
                       setActiveTab("couples");
                     }}
                   >
-                    {/* sinistra */}
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-lg font-bold text-slate-800">
                           {t.name}
                         </span>
-                        <Badge className={LEVEL_CFG[t.level]?.badge}>
-                          {LEVEL_CFG[t.level]?.label}
+                        <Badge
+                          className={
+                            LEVEL_CFG[t.level]?.badge ||
+                            "bg-gray-100 text-gray-500"
+                          }
+                        >
+                          {LEVEL_CFG[t.level]?.label || t.level}
                         </Badge>
                         <Badge className={STATUS_CFG[t.status]?.badge}>
                           {STATUS_CFG[t.status]?.icon}{" "}
@@ -718,12 +764,11 @@ export default function AdminTournaments() {
                               t.matches.filter((m) => m.phase === "group")
                                 .length
                             }{" "}
-                            match
+                            match gironi
                           </Badge>
                         )}
                       </div>
                     </div>
-                    {/* destra: azioni */}
                     <div
                       className="flex gap-2 shrink-0"
                       onClick={(e) => e.stopPropagation()}
@@ -740,7 +785,7 @@ export default function AdminTournaments() {
                       >
                         🗑 Elimina
                       </button>
-                      <span className="text-gray-300 text-lg font-light self-center">
+                      <span className="text-gray-300 text-lg self-center">
                         {isOpen ? "▲" : "▼"}
                       </span>
                     </div>
@@ -767,7 +812,7 @@ export default function AdminTournaments() {
                       </div>
 
                       <div className="px-5 py-5">
-                        {/* ══ TAB COPPIE ══════════════════════════════════════ */}
+                        {/* ══ TAB: COPPIE ════════════════════════════════════ */}
                         {activeTab === "couples" && (
                           <div>
                             <div className="flex items-center justify-between mb-4">
@@ -804,7 +849,7 @@ export default function AdminTournaments() {
                                       key={c._id}
                                       className="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold"
                                     >
-                                      {c.name}
+                                      {coupleShortName(c)}
                                     </span>
                                   ))}
                               </div>
@@ -830,21 +875,23 @@ export default function AdminTournaments() {
                                     <div>
                                       <div className="flex items-center gap-1.5">
                                         {c.seeded && (
-                                          <span className="text-amber-500 text-sm">
+                                          <span className="text-amber-500">
                                             ⭐
                                           </span>
                                         )}
                                         <span className="text-sm font-bold text-slate-700">
-                                          {c.name}
+                                          {coupleShortName(c)}
                                         </span>
                                       </div>
-                                      {(c.player1?.name || c.player2?.name) && (
-                                        <div className="text-xs text-gray-400 mt-0.5">
-                                          {c.player1?.name} ({c.player1?.level})
-                                          · {c.player2?.name} (
-                                          {c.player2?.level})
-                                        </div>
-                                      )}
+                                      <div className="text-xs text-gray-400 mt-0.5">
+                                        {[c.player1?.name, c.player1?.surname]
+                                          .filter(Boolean)
+                                          .join(" ")}
+                                        {" · "}
+                                        {[c.player2?.name, c.player2?.surname]
+                                          .filter(Boolean)
+                                          .join(" ")}
+                                      </div>
                                     </div>
                                     <div className="flex gap-1.5 ml-3 shrink-0">
                                       <button
@@ -880,7 +927,7 @@ export default function AdminTournaments() {
                           </div>
                         )}
 
-                        {/* ══ TAB GIOCATORI ════════════════════════════════════ */}
+                        {/* ══ TAB: GIOCATORI ════════════════════════════════ */}
                         {activeTab === "players" && (
                           <div>
                             <div className="flex items-center justify-between mb-4">
@@ -915,11 +962,11 @@ export default function AdminTournaments() {
                                   >
                                     <div>
                                       <span className="text-sm font-semibold text-slate-700">
-                                        {p.name || p.email}
+                                        {playerDisplayName(p)}
                                       </span>
                                       <div className="flex gap-1.5 mt-0.5">
                                         <Badge className="bg-gray-100 text-gray-500">
-                                          {p.level || "—"}
+                                          {p.level}
                                         </Badge>
                                         {p.hand && (
                                           <Badge className="bg-gray-100 text-gray-500">
@@ -941,10 +988,9 @@ export default function AdminTournaments() {
                           </div>
                         )}
 
-                        {/* ══ TAB TABELLONE ════════════════════════════════════ */}
+                        {/* ══ TAB: TABELLONE ════════════════════════════════ */}
                         {activeTab === "draw" && (
                           <div>
-                            {/* Header */}
                             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                               <div>
                                 <h3 className="font-bold text-gray-700">
@@ -972,7 +1018,7 @@ export default function AdminTournaments() {
                                 {drawLoading
                                   ? "⏳ Generando..."
                                   : t.groups?.length > 0
-                                    ? "🔄 Rigenera tabellone"
+                                    ? "🔄 Rigenera"
                                     : "🎲 Genera tabellone"}
                               </button>
                             </div>
@@ -988,29 +1034,29 @@ export default function AdminTournaments() {
                               <EmptyState
                                 icon="🎲"
                                 title="Tabellone non ancora generato"
-                                sub={`Aggiungi le coppie (min. 3) e clicca "Genera tabellone"`}
+                                sub='Aggiungi le coppie (min. 3) e clicca "Genera tabellone"'
                               />
                             ) : (
                               <div className="space-y-8">
-                                {/* ── Come funziona (info box) ── */}
+                                {/* Info box fasi */}
                                 <div className="grid grid-cols-3 gap-3 text-center text-xs">
                                   {[
                                     {
                                       icon: "⬡",
-                                      label: "Fase gironi",
+                                      label: "Fase Gironi",
                                       desc: "Round-robin",
                                       color: "bg-slate-100 text-slate-600",
                                     },
                                     {
                                       icon: "🥇",
                                       label: "Fase Gold",
-                                      desc: "1° e 2° di ogni girone",
+                                      desc: "1° e 2° per girone",
                                       color: "bg-amber-100 text-amber-700",
                                     },
                                     {
                                       icon: "🥈",
                                       label: "Fase Silver",
-                                      desc: "3° di ogni girone",
+                                      desc: "3° classificato",
                                       color: "bg-gray-100 text-gray-600",
                                     },
                                   ].map((s) => (
@@ -1052,7 +1098,7 @@ export default function AdminTournaments() {
                                           (m) => m.phase === "group",
                                         ).length
                                       }{" "}
-                                      match completati
+                                      completati
                                     </span>
                                   </div>
 
@@ -1078,18 +1124,19 @@ export default function AdminTournaments() {
                                       const done = gMatches.filter(
                                         (m) => m.winner,
                                       ).length;
+
                                       return (
                                         <div
                                           key={group.number}
                                           className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
                                         >
-                                          {/* Header */}
+                                          {/* Header girone */}
                                           <div className="px-4 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 flex items-center justify-between">
                                             <span className="font-bold text-white text-sm">
                                               Girone {group.number}
                                             </span>
                                             <span className="text-xs text-white/60">
-                                              {done}/{gMatches.length}
+                                              {done}/{gMatches.length} ✓
                                             </span>
                                           </div>
 
@@ -1100,9 +1147,9 @@ export default function AdminTournaments() {
                                                 key={s.id}
                                                 className="flex items-center justify-between text-xs py-1"
                                               >
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 min-w-0">
                                                   <span
-                                                    className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                                                    className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
                                                       idx === 0
                                                         ? "bg-amber-400 text-white"
                                                         : idx === 1
@@ -1113,18 +1160,17 @@ export default function AdminTournaments() {
                                                     {idx + 1}
                                                   </span>
                                                   {s.couple?.seeded && (
-                                                    <span className="text-amber-500 text-[10px]">
+                                                    <span className="text-amber-500 text-[10px] shrink-0">
                                                       ⭐
                                                     </span>
                                                   )}
                                                   <span
-                                                    className={`font-semibold truncate max-w-[90px] ${idx > 1 ? "text-gray-400" : "text-slate-700"}`}
+                                                    className={`font-semibold truncate ${idx > 1 ? "text-gray-400" : "text-slate-700"}`}
                                                   >
-                                                    {s.couple?.name ||
-                                                      s.id.slice(-6)}
+                                                    {coupleShortName(s.couple)}
                                                   </span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                <div className="flex items-center gap-1.5 shrink-0 ml-1">
                                                   <span className="text-green-600 font-bold">
                                                     {s.wins}V
                                                   </span>
@@ -1147,7 +1193,7 @@ export default function AdminTournaments() {
                                             ))}
                                           </div>
 
-                                          {/* Match */}
+                                          {/* Match del girone */}
                                           <div className="px-3 py-2 space-y-1.5">
                                             {gMatches.map((m) => {
                                               const c1 = t.couples.find(
@@ -1177,28 +1223,42 @@ export default function AdminTournaments() {
                                                         "",
                                                     });
                                                   }}
-                                                  className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs cursor-pointer transition-all ${
+                                                  className={`flex items-center justify-between rounded-xl px-2.5 py-2 text-xs cursor-pointer transition-all ${
                                                     m.winner
                                                       ? "bg-green-50 border border-green-100 hover:bg-green-100"
                                                       : "bg-gray-50 border border-gray-100 hover:bg-blue-50 hover:border-blue-200"
                                                   }`}
                                                 >
                                                   <span
-                                                    className={`font-semibold truncate max-w-[70px] ${m.winner?.toString() === c1?._id?.toString() ? "text-green-700" : "text-gray-500"}`}
+                                                    className={`font-bold truncate max-w-[60px] ${
+                                                      m.winner?.toString() ===
+                                                      c1?._id?.toString()
+                                                        ? "text-green-700"
+                                                        : "text-gray-600"
+                                                    }`}
                                                   >
-                                                    {c1?.name || "?"}
+                                                    {coupleShortName(c1)}
                                                   </span>
                                                   <span
-                                                    className={`mx-1.5 px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${m.score ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-400"}`}
+                                                    className={`mx-1 px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
+                                                      m.score
+                                                        ? "bg-yellow-100 text-yellow-700"
+                                                        : "bg-gray-100 text-gray-400"
+                                                    }`}
                                                   >
                                                     {m.score || "vs"}
                                                   </span>
                                                   <span
-                                                    className={`font-semibold truncate max-w-[70px] text-right ${m.winner?.toString() === c2?._id?.toString() ? "text-green-700" : "text-gray-500"}`}
+                                                    className={`font-bold truncate max-w-[60px] text-right ${
+                                                      m.winner?.toString() ===
+                                                      c2?._id?.toString()
+                                                        ? "text-green-700"
+                                                        : "text-gray-600"
+                                                    }`}
                                                   >
-                                                    {c2?.name || "?"}
+                                                    {coupleShortName(c2)}
                                                   </span>
-                                                  <span className="ml-1.5 shrink-0">
+                                                  <span className="ml-1 shrink-0">
                                                     {m.winner ? "✅" : "✏️"}
                                                   </span>
                                                 </div>
@@ -1273,7 +1333,6 @@ export default function AdminTournaments() {
       {playerModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            {/* header sticky */}
             <div className="px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-800">
@@ -1281,7 +1340,7 @@ export default function AdminTournaments() {
                 </h3>
                 <button
                   onClick={() => setPlayerModal(null)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
                 >
                   ✕
                 </button>
@@ -1295,7 +1354,7 @@ export default function AdminTournaments() {
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  🔍 Esistenti
+                  🔍 Giocatori esistenti
                 </button>
                 <button
                   onClick={() => setPlayerTab("new")}
@@ -1305,18 +1364,17 @@ export default function AdminTournaments() {
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  ➕ Nuovo
+                  ➕ Nuovo giocatore
                 </button>
               </div>
             </div>
 
-            {/* body scrollabile */}
-            <div className="p-6 space-y-4 overflow-y-auto">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {playerTab === "search" ? (
                 <>
                   <input
                     type="text"
-                    placeholder="🔍 Cerca per nome o email..."
+                    placeholder="🔍 Cerca per nome, cognome o email..."
                     value={playerSearch}
                     onChange={(e) => setPlayerSearch(e.target.value)}
                     className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-300"
@@ -1341,13 +1399,13 @@ export default function AdminTournaments() {
                           >
                             <div>
                               <span className="text-sm font-semibold text-slate-700">
-                                {p.name}
+                                {playerDisplayName(p)}
                               </span>
-                              <span className="text-xs text-gray-400 ml-2">
-                                {p.email?.includes("@torneo.local")
-                                  ? ""
-                                  : p.email}
-                              </span>
+                              {!p.email?.includes("@torneo.local") && (
+                                <span className="text-xs text-gray-400 ml-2">
+                                  {p.email}
+                                </span>
+                              )}
                               <div className="flex gap-1.5 mt-0.5">
                                 <Badge className="bg-gray-100 text-gray-500">
                                   {p.level}
@@ -1384,23 +1442,45 @@ export default function AdminTournaments() {
                     ℹ️ Verrà creato un nuovo account con password temporanea
                     casuale
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                      Nome e Cognome *
-                    </label>
-                    <input
-                      type="text"
-                      value={newPlayerForm.name}
-                      onChange={(e) =>
-                        setNewPlayerForm({
-                          ...newPlayerForm,
-                          name: e.target.value,
-                        })
-                      }
-                      placeholder="es. Marco Rossi"
-                      className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-300"
-                    />
+
+                  {/* Nome + Cognome separati */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        Nome *
+                      </label>
+                      <input
+                        type="text"
+                        value={newPlayerForm.name}
+                        onChange={(e) =>
+                          setNewPlayerForm({
+                            ...newPlayerForm,
+                            name: e.target.value,
+                          })
+                        }
+                        placeholder="es. Marco"
+                        className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        Cognome *
+                      </label>
+                      <input
+                        type="text"
+                        value={newPlayerForm.surname}
+                        onChange={(e) =>
+                          setNewPlayerForm({
+                            ...newPlayerForm,
+                            surname: e.target.value,
+                          })
+                        }
+                        placeholder="es. Rossi"
+                        className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-300"
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">
                       Email{" "}
@@ -1421,6 +1501,7 @@ export default function AdminTournaments() {
                       className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-300"
                     />
                   </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -1458,9 +1539,11 @@ export default function AdminTournaments() {
                       >
                         <option value="destra">Destra</option>
                         <option value="sinistra">Sinistra</option>
+                        <option value="ambidestro">Ambidestro</option>
                       </select>
                     </div>
                   </div>
+
                   <button
                     onClick={() => addNewPlayer(playerModal)}
                     className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold hover:from-emerald-600 hover:to-teal-700"
@@ -1471,7 +1554,7 @@ export default function AdminTournaments() {
               )}
             </div>
 
-            <div className="px-6 pb-6 shrink-0">
+            <div className="px-6 pb-6 shrink-0 border-t border-gray-100 pt-4">
               <button
                 onClick={() => setPlayerModal(null)}
                 className="w-full py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200"
@@ -1495,7 +1578,7 @@ export default function AdminTournaments() {
               </h3>
               <button
                 onClick={() => setCoupleModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
               >
                 ✕
               </button>
@@ -1504,6 +1587,7 @@ export default function AdminTournaments() {
               ℹ️ I giocatori selezionati vengono automaticamente aggiunti alla
               lista giocatori
             </div>
+
             {["player1Id", "player2Id"].map((field, i) => (
               <div key={field}>
                 <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -1525,19 +1609,26 @@ export default function AdminTournaments() {
                     )
                     .map((p) => (
                       <option key={p._id} value={p._id}>
-                        {p.name} ({p.level})
+                        {playerDisplayName(p)} ({p.level})
                       </option>
                     ))}
                 </select>
               </div>
             ))}
+
             {coupleForm.player1Id && coupleForm.player2Id && (
               <div className="bg-slate-50 rounded-2xl px-4 py-2.5 text-sm text-slate-600 text-center font-medium">
                 🤝{" "}
-                {allPlayers.find((p) => p._id === coupleForm.player1Id)?.name} /{" "}
-                {allPlayers.find((p) => p._id === coupleForm.player2Id)?.name}
+                {playerDisplayName(
+                  allPlayers.find((p) => p._id === coupleForm.player1Id) || {},
+                )}
+                {" / "}
+                {playerDisplayName(
+                  allPlayers.find((p) => p._id === coupleForm.player2Id) || {},
+                )}
               </div>
             )}
+
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
                 Nome coppia{" "}
@@ -1555,6 +1646,7 @@ export default function AdminTournaments() {
                 className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-teal-300"
               />
             </div>
+
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setCoupleModal(null)}
@@ -1585,23 +1677,33 @@ export default function AdminTournaments() {
               </h3>
               <button
                 onClick={() => setScoreModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
               >
                 ✕
               </button>
             </div>
 
-            {/* Preview coppia */}
+            {/* Preview */}
             <div className="bg-slate-50 rounded-2xl p-4 flex items-center justify-center gap-3 text-sm">
-              <span className="font-bold text-slate-800 text-right max-w-[110px] truncate">
-                {scoreModal.c1?.seeded ? "⭐ " : ""}
-                {scoreModal.c1?.name || "?"}
+              <div className="text-right flex-1">
+                <div className="font-bold text-slate-800">
+                  {coupleShortName(scoreModal.c1)}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {coupleFullName(scoreModal.c1)}
+                </div>
+              </div>
+              <span className="text-gray-300 font-light text-lg shrink-0">
+                vs
               </span>
-              <span className="text-gray-300 font-light text-lg">vs</span>
-              <span className="font-bold text-slate-800 max-w-[110px] truncate">
-                {scoreModal.c2?.seeded ? "⭐ " : ""}
-                {scoreModal.c2?.name || "?"}
-              </span>
+              <div className="text-left flex-1">
+                <div className="font-bold text-slate-800">
+                  {coupleShortName(scoreModal.c2)}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {coupleFullName(scoreModal.c2)}
+                </div>
+              </div>
             </div>
 
             {/* Punteggio */}
@@ -1620,7 +1722,7 @@ export default function AdminTournaments() {
               />
             </div>
 
-            {/* Seleziona vincitore */}
+            {/* Vincitore */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Vincitore
@@ -1639,7 +1741,7 @@ export default function AdminTournaments() {
                     }`}
                   >
                     {c?.seeded ? "⭐ " : ""}
-                    {c?.name || "?"}
+                    {coupleShortName(c)}
                     {scoreForm.winner === c?._id?.toString() && (
                       <div className="text-[10px] mt-0.5 font-normal opacity-80">
                         ✓ Vincitore

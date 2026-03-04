@@ -8,14 +8,14 @@ const TYPE_COLORS = {
   booking: { bg: "#ef4444", border: "#dc2626" },
   academy: { bg: "#3b82f6", border: "#2563eb" },
   lesson: { bg: "#a855f7", border: "#9333ea" },
-  blocked: { bg: "#eab308", border: "#ca8a04" },
+  blocked: { bg: "#9ca3af", border: "#6b7280" }, // ← grigio
 };
 
 const EVENT_LABELS = {
-  booking: "🔒 Occupato",
+  booking: "🔴 Occupato",
   academy: "🎓 Academy",
   lesson: "👨‍🏫 Lezione",
-  blocked: "🚫 Bloccato",
+  blocked: "🔒 Bloccato/Torneo", // ← aggiornato
 };
 
 const generateSlots = (startHour, endHour) => {
@@ -76,7 +76,6 @@ function DesktopTimeline({ courts, events, slots, slotWidth }) {
           const courtEvents = events.filter(
             (e) => e.extendedProps?.courtId === court._id,
           );
-
           return (
             <div
               key={court._id}
@@ -111,6 +110,7 @@ function DesktopTimeline({ courts, events, slots, slotWidth }) {
                       }}
                     />
                   ))}
+
                   {/* Indicatore ora corrente */}
                   {nowLeft > 0 && nowLeft < totalWidth && (
                     <div
@@ -120,18 +120,17 @@ function DesktopTimeline({ courts, events, slots, slotWidth }) {
                       <div className="w-2 h-2 rounded-full bg-emerald-500 -translate-x-[3px] mt-1" />
                     </div>
                   )}
+
                   {/* Eventi */}
                   {courtEvents.map((event) => {
                     const type = event.extendedProps?.type || "booking";
                     const color = TYPE_COLORS[type] || TYPE_COLORS.booking;
                     const label = EVENT_LABELS[type] || EVENT_LABELS.booking;
                     const ep = event.extendedProps || {};
-
-                    // Nomi da mostrare nella card
                     const playerNames = [
                       ep.player1Name,
-                      ...(ep.playerNames || []), // giocatori registrati
-                      ...(ep.guestPlayers || []), // ospiti
+                      ...(ep.playerNames || []),
+                      ...(ep.guestPlayers || []),
                     ].filter(Boolean);
 
                     return (
@@ -196,10 +195,7 @@ function MobileTimeline({ courts, events }) {
             className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl overflow-hidden"
           >
             <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500">
-              <div className="font-bold text-white text-base">
-                {" "}
-                {court.name}
-              </div>
+              <div className="font-bold text-white text-base">{court.name}</div>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                   court.status === "available"
@@ -218,8 +214,8 @@ function MobileTimeline({ courts, events }) {
               ) : (
                 courtEvents.map((event) => {
                   const type = event.extendedProps?.type || "booking";
-                  const color = TYPE_COLORS[type];
-                  const label = EVENT_LABELS[type];
+                  const color = TYPE_COLORS[type] || TYPE_COLORS.booking;
+                  const label = EVENT_LABELS[type] || EVENT_LABELS.booking;
                   return (
                     <div
                       key={event.id}

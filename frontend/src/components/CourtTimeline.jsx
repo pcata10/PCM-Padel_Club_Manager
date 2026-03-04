@@ -8,24 +8,14 @@ const TYPE_COLORS = {
     text: "text-white",
     border: "border-purple-600",
   },
-  blocked: {
-    bg: "bg-yellow-400",
-    text: "text-gray-800",
-    border: "border-yellow-500",
-  },
-  tournament: {
-    bg: "bg-gray-500",
-    text: "text-white",
-    border: "border-gray-600",
-  }, // ← nuovo
+  blocked: { bg: "bg-gray-400", text: "text-white", border: "border-gray-500" }, // ← grigio
 };
 
 const TYPE_LABELS = {
-  booking: "🔴 Prenotazione",
-  academy: "🎓 Academy",
-  lesson: "👨‍🏫 Lezione",
-  blocked: "🔒 Bloccato",
-  tournament: "🏆 Torneo", // ← nuovo
+  booking: "Prenotazione",
+  academy: "Academy",
+  lesson: "Lezione",
+  blocked: "Bloccato",
 };
 
 const START_HOUR = 8;

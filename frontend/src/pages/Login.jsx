@@ -32,10 +32,18 @@ export default function Login() {
         form,
       );
       localStorage.setItem("token", res.data.token);
+      // ← AGGIUNGI QUESTA RIGA
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: res.data.player.id,
+          name: res.data.player.name,
+          email: res.data.player.email,
+          role: res.data.player.role || "player",
+        }),
+      );
       axios.defaults.headers.common["Authorization"] =
         `Bearer ${res.data.token}`;
-
-      // ── Un solo navigate, dopo aver letto il role dal token appena salvato ──
       const role = getRole();
       navigate(role === "admin" ? "/admin" : "/dashboard");
     } catch (err) {

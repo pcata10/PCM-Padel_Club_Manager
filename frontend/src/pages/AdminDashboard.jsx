@@ -34,28 +34,16 @@ const STATUS_CONFIG = {
     icon: "👨‍🏫",
   },
 };
-
 const SLOT_STYLES = {
-  free: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  booking: "bg-red-100 text-red-700 border-red-200",
-  blocked: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  academy: "bg-blue-100 text-blue-700 border-blue-200",
-  lesson: "bg-purple-100 text-purple-700 border-purple-200",
-  tournament: "bg-amber-200 text-amber-800 border-amber-400",
-};
-
-const SLOT_STYLES_DESKTOP = {
   free: "bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-200",
   booking:
     "bg-red-100 text-red-700 border-red-200 cursor-pointer hover:brightness-95",
   blocked:
-    "bg-yellow-100 text-yellow-700 border-yellow-200 cursor-pointer hover:brightness-95",
+    "bg-gray-200 text-gray-600 border-gray-300 cursor-pointer hover:brightness-95", // ← grigio
   academy:
     "bg-blue-100 text-blue-700 border-blue-200 cursor-pointer hover:brightness-95",
   lesson:
     "bg-purple-100 text-purple-700 border-purple-200 cursor-pointer hover:brightness-95",
-  tournament:
-    "bg-amber-200 text-amber-800 border-amber-400 cursor-not-allowed opacity-80",
 };
 
 const SLOT_ICONS = {
@@ -64,7 +52,20 @@ const SLOT_ICONS = {
   blocked: "🔒",
   academy: "🎓",
   lesson: "👨‍🏫",
-  tournament: "🏆",
+};
+
+const SLOT_STYLES_DESKTOP = {
+  free: "bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-200",
+  booking:
+    "bg-red-100 text-red-700 border-red-200 cursor-pointer hover:brightness-95",
+  blocked:
+    "bg-gray-300 text-gray-500 border-gray-400 cursor-pointer hover:brightness-95",
+  academy:
+    "bg-blue-100 text-blue-700 border-blue-200 cursor-pointer hover:brightness-95",
+  lesson:
+    "bg-purple-100 text-purple-700 border-purple-200 cursor-pointer hover:brightness-95",
+  tournament:
+    "bg-amber-200 text-amber-800 border-amber-400 cursor-not-allowed opacity-80",
 };
 
 const SLOT_LEGEND = [
@@ -73,7 +74,6 @@ const SLOT_LEGEND = [
   { type: "blocked", label: "Bloccato" },
   { type: "academy", label: "Academy" },
   { type: "lesson", label: "Lezione" },
-  { type: "tournament", label: "Torneo" },
 ];
 
 function buildSlots(dateStr, courtEvts) {

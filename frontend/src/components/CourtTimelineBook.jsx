@@ -8,7 +8,14 @@ const TYPE_COLORS = {
   booking: { bg: "#ef4444", border: "#dc2626" },
   academy: { bg: "#3b82f6", border: "#2563eb" },
   lesson: { bg: "#a855f7", border: "#9333ea" },
-  blocked: { bg: "#eab308", border: "#ca8a04" },
+  blocked: { bg: "#9ca3af", border: "#6b7280" }, // ← grigio
+};
+
+const EVENT_LABELS = {
+  booking: "🔴 Occupato",
+  academy: "🎓 Academy",
+  lesson: "👨‍🏫 Lezione",
+  blocked: "🔒 Bloccato/Torneo",
 };
 
 const generateSlots = (startHour, endHour) => {
@@ -75,20 +82,16 @@ function DesktopBook({ courts, events, slots, slotWidth }) {
               className={`flex items-stretch ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/80"}`}
               style={{ minHeight: "68px" }}
             >
-              {/* Label */}
               <div className="w-28 flex-shrink-0 px-2 py-2 border-r-2 border-gray-200 flex flex-col justify-center">
                 <div className="font-bold text-gray-800 text-xs leading-tight">
                   {court.name}
                 </div>
               </div>
-
-              {/* Timeline */}
               <div className="flex-1 overflow-hidden">
                 <div
                   className="relative h-full"
                   style={{ width: `${totalWidth}px`, minHeight: "68px" }}
                 >
-                  {/* Griglia */}
                   {slots.map((slot, i) => (
                     <div
                       key={slot}
@@ -104,7 +107,6 @@ function DesktopBook({ courts, events, slots, slotWidth }) {
                     />
                   ))}
 
-                  {/* Ora corrente */}
                   {nowLeft > 0 && nowLeft < totalWidth && (
                     <div
                       className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-20"
@@ -118,6 +120,7 @@ function DesktopBook({ courts, events, slots, slotWidth }) {
                   {courtEvents.map((event) => {
                     const type = event.extendedProps?.type || "booking";
                     const color = TYPE_COLORS[type] || TYPE_COLORS.booking;
+                    const label = EVENT_LABELS[type] || EVENT_LABELS.booking;
                     return (
                       <div
                         key={event.id}
@@ -127,10 +130,10 @@ function DesktopBook({ courts, events, slots, slotWidth }) {
                           backgroundColor: color.bg,
                           border: `1px solid ${color.border}`,
                         }}
-                        title={`${new Date(event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
+                        title={`${new Date(event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} – ${new Date(event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
                       >
                         <div className="text-[10px] font-bold text-white truncate">
-                          🔒 Occupato
+                          {label}
                         </div>
                         <div className="text-[9px] text-white/80 truncate">
                           {new Date(event.start).toLocaleTimeString("it-IT", {
@@ -181,7 +184,8 @@ function MobileBook({ courts, events }) {
               ) : (
                 courtEvents.map((event) => {
                   const type = event.extendedProps?.type || "booking";
-                  const color = TYPE_COLORS[type];
+                  const color = TYPE_COLORS[type] || TYPE_COLORS.booking;
+                  const label = EVENT_LABELS[type] || EVENT_LABELS.booking;
                   return (
                     <div
                       key={event.id}
@@ -192,7 +196,7 @@ function MobileBook({ courts, events }) {
                         style={{ backgroundColor: color.bg }}
                       />
                       <div className="flex-1 text-sm font-semibold text-gray-700">
-                        🔒 Occupato
+                        {label}
                       </div>
                       <div className="text-right text-sm font-bold text-gray-700 flex-shrink-0">
                         {new Date(event.start).toLocaleTimeString("it-IT", {

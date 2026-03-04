@@ -1,22 +1,24 @@
 const mongoose = require("mongoose");
 
+const matchSchema = new mongoose.Schema({
+  couple1: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
+  couple2: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
+  score: { type: String, default: "" },
+  winner: { type: mongoose.Schema.Types.ObjectId, ref: "Couple" },
+  phase: { type: String, enum: ["group", "gold", "silver"], default: "group" },
+  group: { type: Number },
+  round: { type: String }, // "F", "SF", "QF", "R16", "R32"
+  court: { type: mongoose.Schema.Types.ObjectId, ref: "Court" },
+  time: { type: String },
+});
+
 const coupleSchema = new mongoose.Schema({
   player1: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
   player2: { type: mongoose.Schema.Types.ObjectId, ref: "Player" },
-  name: { type: String },
-  seeded: { type: Boolean, default: false }, // testa di serie
-});
+  guestName: { type: String, default: "" }, // ← AGGIUNGI
 
-const matchSchema = new mongoose.Schema({
-  couple1: { type: mongoose.Schema.Types.ObjectId },
-  couple2: { type: mongoose.Schema.Types.ObjectId },
-  score: { type: String, default: "" },
-  winner: { type: mongoose.Schema.Types.ObjectId }, // _id coppia vincitrice
-  phase: { type: String, enum: ["group", "gold", "silver"], default: "group" },
-  round: { type: String }, // es. "QF", "SF", "F"
-  group: { type: Number }, // numero girone (solo fase group)
-  court: { type: mongoose.Schema.Types.ObjectId, ref: "Court" },
-  time: { type: String }, // orario es. "10:00"
+  name: { type: String, default: "" },
+  seeded: { type: Boolean, default: false },
 });
 
 const groupSchema = new mongoose.Schema({
@@ -35,7 +37,6 @@ const tournamentSchema = new mongoose.Schema(
       enum: ["intermedio", "agonista"],
       default: "intermedio",
     },
-
     status: {
       type: String,
       enum: ["open", "running", "finished"],
@@ -50,4 +51,5 @@ const tournamentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("Tournament", tournamentSchema);
+module.exports =
+  mongoose.models.Tournament || mongoose.model("Tournament", tournamentSchema);

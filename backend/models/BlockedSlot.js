@@ -1,11 +1,29 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 
-const BlockedSlotSchema = new mongoose.Schema({
-  court:     { type: mongoose.Schema.Types.ObjectId, ref: 'Court', required: true },
-  type:      { type: String, enum: ['academy', 'lesson', 'blocked'], required: true },
-  startTime: { type: Date, required: true },
-  endTime:   { type: Date, required: true },
-  note:      { type: String, default: '' }
-})
+const blockedSlotSchema = new mongoose.Schema(
+  {
+    court: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Court",
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["blocked", "academy", "lesson"],
+      default: "blocked",
+    },
+    startTime: { type: Date, required: true },
+    endTime: { type: Date, required: true },
+    note: { type: String, default: "" },
+    tournamentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tournament",
+      default: null,
+    },
+  },
+  { timestamps: true },
+);
 
-module.exports = mongoose.model('BlockedSlot', BlockedSlotSchema)
+module.exports =
+  mongoose.models.BlockedSlot ||
+  mongoose.model("BlockedSlot", blockedSlotSchema);

@@ -4,7 +4,9 @@ import NavBar from "../components/NavBar.jsx";
 import axios from "axios";
 import CourtTimelineDashboard from "../components/CourtTimelineDashboard.jsx";
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL });
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
+});
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -14,7 +16,7 @@ api.interceptors.request.use((config) => {
 const SLOT_STYLES = {
   free: "bg-emerald-100 text-emerald-700 border-emerald-200",
   booking: "bg-red-100 text-red-700 border-red-200",
-  blocked: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  blocked: "bg-gray-200 text-gray-600 border-gray-300",
   academy: "bg-blue-100 text-blue-700 border-blue-200",
   lesson: "bg-purple-100 text-purple-700 border-purple-200",
 };
@@ -26,6 +28,388 @@ const SLOT_ICONS = {
   lesson: "👨‍🏫",
 };
 
+// ── MODAL ISCRIZIONE TORNEO ───────────────────────────────────────
+function TournamentSignupModal({ tournament, mode, user, onClose, onSuccess }) {
+  const [partnerSearch, setPartnerSearch] = useState("");
+  const [searchState, setSearchState] = useState("idle"); // idle | notfound | found
+  const [foundPlayer, setFoundPlayer] = useState(null);
+  const [subMode, setSubMode] = useState(null); // "guest" | "register"
+  const [guestName, setGuestName] = useState("");
+  const [newPlayer, setNewPlayer] = useState({
+    name: "",
+    surname: "",
+    email: "",
+    level: "intermedio",
+    hand: "destra",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // ── Step 1: cerca il partner ──────────────────────────────────
+  const handleSearch = async () => {
+    if (!partnerSearch.trim()) return setError("Inserisci nome o email");
+    setLoading(true);
+    setError("");
+    try {
+      await api.post(`/api/tournaments/${tournament._id}/couples`, {
+        player1Id: user.id,
+        player2Id: partnerSearch.trim(),
+      });
+      onSuccess();
+    } catch (err) {
+      if (err.response?.data?.notFound) {
+        setSearchState("notfound");
+      } else {
+        setError(err.response?.data?.msg || "Errore");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 2a: aggiungi ospite ──────────────────────────────────
+  const handleGuest = async () => {
+    if (!guestName.trim()) return setError("Inserisci il nome dell'ospite");
+    setLoading(true);
+    setError("");
+    try {
+      await api.post(`/api/tournaments/${tournament._id}/couples`, {
+        player1Id: user.id,
+        player2Guest: guestName.trim(),
+      });
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.msg || "Errore");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 2b: registra e aggiungi ─────────────────────────────
+  const handleRegister = async () => {
+    if (!newPlayer.name || !newPlayer.email)
+      return setError("Nome e email obbligatori");
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.post(
+        `/api/tournaments/${tournament._id}/couples/register`,
+        { player1Id: user.id, newPlayer },
+      );
+      setSuccessMsg(
+        `✅ Partner registrato!\nEmail: ${res.data.newPlayer.email}\nPassword temporanea: ${res.data.newPlayer.tempPassword}\n\nComunicagli le credenziali.`,
+      );
+      setTimeout(() => onSuccess(), 3500);
+    } catch (err) {
+      setError(err.response?.data?.msg || "Errore registrazione");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-gray-800">
+            {mode === "single"
+              ? "👤 Iscrizione singola"
+              : "🤝 Iscrizione in coppia"}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Info torneo */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+          <p className="font-bold text-amber-800">{tournament.name}</p>
+          <p className="text-sm text-amber-700 mt-0.5">
+            📅{" "}
+            {new Date(tournament.date).toLocaleDateString("it-IT", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}{" "}
+            · ⏰ {tournament.startTime} – {tournament.endTime}
+          </p>
+        </div>
+
+        {/* ── ISCRIZIONE SINGOLA ── */}
+        {mode === "single" && (
+          <>
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 text-sm text-blue-700">
+              ℹ️ Ti iscriverai come giocatore singolo. L'admin potrà abbinarti a
+              un partner.
+            </div>
+            <button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  await api.post(`/api/tournaments/${tournament._id}/players`, {
+                    playerId: user.id,
+                  });
+                  onSuccess();
+                } catch (err) {
+                  setError(err.response?.data?.msg || "Errore");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-bold hover:from-blue-600 hover:to-blue-700 disabled:opacity-60 transition-all"
+            >
+              {loading ? "⏳ Iscrizione..." : "✅ Conferma iscrizione"}
+            </button>
+          </>
+        )}
+
+        {/* ── ISCRIZIONE COPPIA ── */}
+        {mode === "couple" && (
+          <>
+            {/* STEP 1 — cerca partner */}
+            {searchState === "idle" && !subMode && (
+              <>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Nome o email del tuo partner
+                  </label>
+                  <input
+                    type="text"
+                    value={partnerSearch}
+                    onChange={(e) => setPartnerSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="es. Marco Rossi oppure marco@email.com"
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-amber-300"
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold hover:from-amber-600 hover:to-orange-600 disabled:opacity-60 transition-all"
+                >
+                  {loading ? "⏳ Ricerca..." : "🔍 Cerca partner"}
+                </button>
+              </>
+            )}
+
+            {/* STEP 2 — partner non trovato → scegli opzione */}
+            {searchState === "notfound" && !subMode && (
+              <>
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 text-sm text-orange-700">
+                  ⚠️ Nessun giocatore trovato per{" "}
+                  <strong>"{partnerSearch}"</strong>.<br />
+                  Come vuoi procedere?
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setSubMode("guest");
+                      setGuestName(partnerSearch);
+                    }}
+                    className="py-3 px-2 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all text-sm"
+                  >
+                    👤 Aggiungi
+                    <br />
+                    come ospite
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSubMode("register");
+                      setNewPlayer((p) => ({ ...p, name: partnerSearch }));
+                    }}
+                    className="py-3 px-2 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all text-sm"
+                  >
+                    ✍️ Registra
+                    <br />e aggiungi
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setSearchState("idle");
+                    setPartnerSearch("");
+                  }}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline"
+                >
+                  ← Riprova la ricerca
+                </button>
+              </>
+            )}
+
+            {/* STEP 2a — ospite */}
+            {subMode === "guest" && (
+              <>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-600">
+                  👤 Il partner sarà aggiunto come <strong>ospite</strong>{" "}
+                  (senza account).
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Nome ospite *
+                  </label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Nome e Cognome"
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-gray-300"
+                  />
+                </div>
+                <button
+                  onClick={handleGuest}
+                  disabled={loading}
+                  className="w-full py-3 bg-gray-600 text-white rounded-2xl font-bold hover:bg-gray-700 disabled:opacity-60 transition-all"
+                >
+                  {loading ? "⏳ Salvataggio..." : "✅ Aggiungi ospite"}
+                </button>
+                <button
+                  onClick={() => setSubMode(null)}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline"
+                >
+                  ← Indietro
+                </button>
+              </>
+            )}
+
+            {/* STEP 2b — registra nuovo utente */}
+            {subMode === "register" && !successMsg && (
+              <>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-sm text-emerald-700">
+                  ✍️ Compila i dati del partner — verrà creato un account e
+                  aggiunto alla coppia.
+                </div>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Nome *
+                      </label>
+                      <input
+                        type="text"
+                        value={newPlayer.name}
+                        onChange={(e) =>
+                          setNewPlayer((p) => ({ ...p, name: e.target.value }))
+                        }
+                        className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-300"
+                        placeholder="Mario"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Cognome
+                      </label>
+                      <input
+                        type="text"
+                        value={newPlayer.surname}
+                        onChange={(e) =>
+                          setNewPlayer((p) => ({
+                            ...p,
+                            surname: e.target.value,
+                          }))
+                        }
+                        className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-300"
+                        placeholder="Rossi"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={newPlayer.email}
+                      onChange={(e) =>
+                        setNewPlayer((p) => ({ ...p, email: e.target.value }))
+                      }
+                      className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-300"
+                      placeholder="mario@email.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Livello
+                      </label>
+                      <select
+                        value={newPlayer.level}
+                        onChange={(e) =>
+                          setNewPlayer((p) => ({ ...p, level: e.target.value }))
+                        }
+                        className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                      >
+                        <option value="principiante">Principiante</option>
+                        <option value="intermedio">Intermedio</option>
+                        <option value="avanzato">Avanzato</option>
+                        <option value="agonista">Agonista</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Mano
+                      </label>
+                      <select
+                        value={newPlayer.hand}
+                        onChange={(e) =>
+                          setNewPlayer((p) => ({ ...p, hand: e.target.value }))
+                        }
+                        className="w-full p-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                      >
+                        <option value="destra">Destra</option>
+                        <option value="sinistra">Sinistra</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleRegister}
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl font-bold hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60 transition-all"
+                >
+                  {loading ? "⏳ Registrazione..." : "✅ Registra e iscriviti"}
+                </button>
+                <button
+                  onClick={() => setSubMode(null)}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline"
+                >
+                  ← Indietro
+                </button>
+              </>
+            )}
+
+            {/* Successo registrazione */}
+            {successMsg && (
+              <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-4 text-green-800 text-sm font-semibold whitespace-pre-line">
+                {successMsg}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Errore */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-red-700 text-sm font-semibold">
+            ❌ {error}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+        >
+          Annulla
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── DASHBOARD PRINCIPALE ─────────────────────────────────────────
 export default function Dashboard() {
   const [courts, setCourts] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -35,7 +419,10 @@ export default function Dashboard() {
     new Date().toISOString().slice(0, 10),
   );
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [tournaments, setTournaments] = useState([]);
+  const [tourModal, setTourModal] = useState(null);
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   useEffect(() => {
     fetchData();
@@ -46,14 +433,16 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [courtsRes, bookingsRes, calRes] = await Promise.all([
+      const [courtsRes, bookingsRes, calRes, tourRes] = await Promise.all([
         api.get("/api/courts"),
         api.get("/api/bookings"),
         api.get("/api/calendar"),
+        api.get("/api/tournaments/public"),
       ]);
       setCourts(courtsRes.data);
       setBookings(bookingsRes.data);
       setCalendarEvents(calRes.data);
+      setTournaments(tourRes.data);
     } catch (err) {
       console.error(err);
       if (err.response?.status === 401) navigate("/login");
@@ -128,7 +517,6 @@ export default function Dashboard() {
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
             📋 Le tue prenotazioni
           </h2>
-
           {isMobile ? (
             <div className="space-y-3">
               {activeBookings.slice(0, 10).map((booking) => (
@@ -149,8 +537,6 @@ export default function Dashboard() {
                       minute: "2-digit",
                     })}
                   </div>
-
-                  {/* Partecipanti già presenti */}
                   {(booking.players?.length > 0 ||
                     booking.guestPlayers?.length > 0) && (
                     <div className="mb-3 flex flex-wrap gap-1.5">
@@ -172,7 +558,6 @@ export default function Dashboard() {
                       ))}
                     </div>
                   )}
-
                   <AddPlayersInline bookingId={booking._id} />
                   <button
                     onClick={() => cancelBooking(booking._id)}
@@ -271,12 +656,111 @@ export default function Dashboard() {
           </Link>
         </div>
 
+        {/* ══ PROSSIMI TORNEI ══ */}
+        {tournaments.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 text-center">
+              🏆 Prossimi Tornei
+            </h2>
+            {tournaments.map((t) => {
+              const alreadyPlayer = t.players?.some(
+                (p) => (p._id || p)?.toString() === user?.id?.toString(),
+              );
+              const alreadyCouple = t.couples?.some(
+                (c) =>
+                  c.player1?._id?.toString() === user?.id?.toString() ||
+                  c.player2?._id?.toString() === user?.id?.toString(),
+              );
+              const isIn = alreadyPlayer || alreadyCouple;
+
+              return (
+                <div
+                  key={t._id}
+                  className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl p-5 md:p-6 border-2 border-amber-200"
+                >
+                  {/* Header torneo */}
+                  <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xl font-black text-slate-800">
+                          🏆 {t.name}
+                        </span>
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                            t.level === "agonista"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-orange-100 text-orange-700"
+                          }`}
+                        >
+                          {t.level}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
+                        <span>
+                          📅{" "}
+                          {new Date(t.date).toLocaleDateString("it-IT", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </span>
+                        <span>
+                          ⏰ {t.startTime} – {t.endTime}
+                        </span>
+                        {t.courts?.length > 0 && (
+                          <span>
+                            🏟 {t.courts.map((c) => c.name).join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                        👤 {t.players?.length || 0} giocatori
+                      </span>
+                      <span className="text-sm font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                        🤝 {t.couples?.length || 0} coppie
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CTA */}
+                  {isIn ? (
+                    <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-green-700 font-semibold text-sm text-center">
+                      ✅ Sei già iscritto a questo torneo
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() =>
+                          setTourModal({ tournament: t, mode: "single" })
+                        }
+                        className="py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow text-sm"
+                      >
+                        👤 Iscriviti singolo
+                      </button>
+                      <button
+                        onClick={() =>
+                          setTourModal({ tournament: t, mode: "couple" })
+                        }
+                        className="py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold hover:from-amber-600 hover:to-orange-600 transition-all shadow text-sm"
+                      >
+                        🤝 Iscriviti in coppia
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── DISPONIBILITÀ CAMPI ── */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-gray-800 text-center">
             📅 Disponibilità Campi
           </h2>
-
           <div className="flex justify-center mb-5">
             <input
               type="date"
@@ -312,17 +796,15 @@ export default function Dashboard() {
                           {freeCount} slot liberi
                         </span>
                       </div>
-
                       <div className="p-3 grid grid-cols-4 gap-1.5">
                         {slots.map((slot) => (
                           <div
                             key={slot.time}
                             onClick={() => {
-                              if (slot.type === "free" && !slot.isPast) {
+                              if (slot.type === "free" && !slot.isPast)
                                 navigate(
                                   `/book?date=${selectedDate}&court=${court._id}&time=${slot.time}`,
                                 );
-                              }
                             }}
                             className={`rounded-xl border px-1 py-1.5 text-center transition-all duration-150
                               ${slot.isPast ? "opacity-25" : ""}
@@ -338,12 +820,11 @@ export default function Dashboard() {
                           </div>
                         ))}
                       </div>
-
                       <div className="px-3 pb-3 flex flex-wrap gap-1.5">
                         {[
                           { type: "free", label: "Libero" },
                           { type: "booking", label: "Prenotato" },
-                          { type: "blocked", label: "Bloccato" },
+                          { type: "blocked", label: "Bloccato/Torneo" },
                           { type: "academy", label: "Academy" },
                           { type: "lesson", label: "Lezione" },
                         ].map(({ type, label }) => (
@@ -375,8 +856,8 @@ export default function Dashboard() {
                   Lezione
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded bg-yellow-400 inline-block" />{" "}
-                  Bloccato
+                  <span className="w-4 h-4 rounded bg-gray-400 inline-block" />{" "}
+                  Bloccato/Torneo
                 </span>
               </div>
               <CourtTimelineDashboard courts={courts} events={eventsForDate} />
@@ -384,13 +865,27 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── MODAL ISCRIZIONE TORNEO ── */}
+      {tourModal && (
+        <TournamentSignupModal
+          tournament={tourModal.tournament}
+          mode={tourModal.mode}
+          user={user}
+          onClose={() => setTourModal(null)}
+          onSuccess={() => {
+            setTourModal(null);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ── COMPONENTE: aggiungi giocatori inline ──────────────────────────
+// ── COMPONENTE: aggiungi giocatori inline ─────────────────────────
 function AddPlayersInline({ bookingId }) {
-  const API = import.meta.env.VITE_API_URL;
+  const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState([""]);
   const [saving, setSaving] = useState(false);
