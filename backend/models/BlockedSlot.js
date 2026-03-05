@@ -20,6 +20,7 @@ const blockedSlotSchema = new mongoose.Schema(
       ref: "Tournament",
       default: null,
     },
+    players: { type: [String], default: [] },
   },
   { timestamps: true },
 );

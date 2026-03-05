@@ -147,39 +147,45 @@ app.get("/api/config", (req, res) => {
 });
 
 // ── AUTH ───────────────────────────────────────────────────────────
-app.post("/api/register", async (req, res) => {
-  try {
-    const { email, password, name, level, hand } = req.body;
-    const existing = await Player.findOne({
-      email: email.trim().toLowerCase(),
-    });
-    if (existing) return res.status(400).json({ msg: "Email già registrata" });
-    const hashed = await bcrypt.hash(password, 10);
-    const player = new Player({
-      email: email.trim().toLowerCase(),
-      password: hashed,
-      name,
-      level,
-      hand,
-    });
-    await player.save();
-    const token = jwt.sign(
-      { id: player._id, role: player.role },
-      process.env.JWT_SECRET,
-    );
-    res.json({
-      token,
-      player: {
-        id: player._id,
-        email: player.email,
-        name,
-        level,
-        role: player.role,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ msg: "Errore registrazione", error: err.message });
-  }
+// app.post("/api/register", async (req, res) => {
+//   try {
+//     const { email, password, name, level, hand } = req.body;
+//     const existing = await Player.findOne({
+//       email: email.trim().toLowerCase(),
+//     });
+//     if (existing) return res.status(400).json({ msg: "Email già registrata" });
+//     const hashed = await bcrypt.hash(password, 10);
+//     const player = new Player({
+//       email: email.trim().toLowerCase(),
+//       password: hashed,
+//       name,
+//       level,
+//       hand,
+//     });
+//     await player.save();
+//     const token = jwt.sign(
+//       { id: player._id, role: player.role },
+//       process.env.JWT_SECRET,
+//     );
+//     res.json({
+//       token,
+//       player: {
+//         id: player._id,
+//         email: player.email,
+//         name,
+//         level,
+//         role: player.role,
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({ msg: "Errore registrazione", error: err.message });
+//   }
+// });
+//
+app.post("/api/register", (req, res) => {
+  res.status(403).json({
+    msg: "Registrazione pubblica disabilitata. Contatta l'amministratore.",
+  });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -429,11 +435,14 @@ app.get("/api/blocked-slots", auth, async (req, res) => {
 });
 
 app.post("/api/blocked-slots", auth, adminOnly, async (req, res) => {
-  const { court, type, startTime, endTime, note, tournamentId } = req.body;
+  const { court, type, startTime, endTime, note, tournamentId, players } =
+    req.body;
   // ← usa toDate() per correggere il timezone
   const start = toDate(startTime);
   const end = toDate(endTime);
-
+  const filteredPlayers = players.filter((p) => p?.trim());
+  if (filteredPlayers.length === 0)
+    return res.status(400).json({ msg: "Inserire almeno un giocatore" });
   const overlap = await Booking.findOne({
     court,
     status: "confirmed",
@@ -450,6 +459,7 @@ app.post("/api/blocked-slots", auth, adminOnly, async (req, res) => {
     endTime: end,
     note,
     tournamentId,
+    players,
   });
   await slot.save();
   res.json(slot);
@@ -560,22 +570,35 @@ app.get("/api/calendar", auth, async (req, res) => {
 
   const blockedEvents = blockedSlots
     .filter((s) => s.court)
-    .map((s) => ({
-      id: `blocked-${s._id}`,
-      title:
+    .map((s) => {
+      // Per "blocked" con players → usa i nomi come title
+      const playersLabel =
+        s.type === "blocked" && s.players?.length > 0
+          ? s.players.join(" · ")
+          : null;
+
+      const title =
         s.type === "academy"
           ? `🎓 ${s.note || "Academy"}`
           : s.type === "lesson"
             ? `👨‍🏫 ${s.note || "Lezione"}`
-            : `🔒 ${s.note || "Campo Bloccato"}`,
-      start: s.startTime,
-      end: s.endTime,
-      extendedProps: {
-        courtId: s.court._id.toString(),
-        type: s.type,
-        blockedSlotId: s._id.toString(),
-      },
-    }));
+            : playersLabel
+              ? playersLabel // ← nomi diretti, senza 🔒
+              : `🔒 ${s.note || "Campo Bloccato"}`;
+
+      return {
+        id: `blocked-${s._id}`,
+        title,
+        start: s.startTime,
+        end: s.endTime,
+        extendedProps: {
+          courtId: s.court._id.toString(),
+          type: s.type,
+          blockedSlotId: s._id.toString(),
+          players: s.players || [], // ← NUOVO: espone i players
+        },
+      };
+    });
 
   res.json([...bookingEvents, ...blockedEvents]);
 });

@@ -54,7 +54,7 @@ export default function NavBar() {
                 Admin
               </Link>
             )}
-            {role === "admin" && (
+            {role === "" && (
               <Link
                 to="/report"
                 className="px-6 py-2 bg-indigo-400 text-white rounded-xl font-semibold shadow-md hover:bg-indigo-600 hover:-translate-y-0.5 transition-all"
@@ -62,7 +62,7 @@ export default function NavBar() {
                 Report
               </Link>
             )}
-            {role === "admin" && (
+            {role === "" && (
               <Link
                 to="/admin/tournaments"
                 className="px-6 py-2 bg-sky-500 text-white rounded-xl font-semibold shadow-md hover:bg-sky-600 hover:-translate-y-0.5 transition-all"

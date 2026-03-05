@@ -155,6 +155,18 @@ function TimelineDesktop({ courts, events, onEventClick, slots, slotWidth }) {
                   {courtEvents.map((event) => {
                     const type = event.extendedProps?.type || "booking";
                     const colors = TYPE_COLORS[type] || TYPE_COLORS.booking;
+
+                    // ── MODIFICA: per "blocked" mostra nomi giocatori ──
+                    const players = event.extendedProps?.players || [];
+                    const displayTitle =
+                      type === "blocked" && players.length > 0
+                        ? players.join(" · ")
+                        : event.title;
+                    const tooltipTitle =
+                      type === "blocked" && players.length > 0
+                        ? players.join(", ")
+                        : event.title;
+
                     return (
                       <div
                         key={event.id}
@@ -163,10 +175,10 @@ function TimelineDesktop({ courts, events, onEventClick, slots, slotWidth }) {
                           border ${colors.bg} ${colors.text} ${colors.border}
                           hover:brightness-110 hover:shadow-lg transition-all overflow-hidden z-10`}
                         style={getEventStyle(event)}
-                        title={`${event.title} | ${new Date(event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
+                        title={`${tooltipTitle} | ${new Date(event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
                       >
                         <div className="text-[10px] font-bold truncate leading-tight">
-                          {event.title}
+                          {displayTitle}
                         </div>
                         <div className="text-[9px] opacity-80 truncate">
                           {new Date(event.start).toLocaleTimeString("it-IT", {
