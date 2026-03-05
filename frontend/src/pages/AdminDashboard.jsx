@@ -431,7 +431,7 @@ export default function AdminDashboard() {
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-blue-800 bg-clip-text text-transparent">
             ✏️ Dashboard Amministratore
-            {slotDate && (
+            {/* {slotDate && (
               <p className="text-sm text-black mt-1 px-1 capitalize font-normal">
                 {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
                   weekday: "long",
@@ -440,24 +440,27 @@ export default function AdminDashboard() {
                   year: "numeric",
                 })}
               </p>
-            )}
+            )}*/}
           </h2>
           <div className="flex justify-center mb-4">
-            <input
-              type="date"
-              value={slotDate}
-              onChange={(e) => setSlotDate(e.target.value)}
-              min={new Date().toISOString().slice(0, 10)}
-              className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-sm"
-              style={{
-                WebkitAppearance: "none",
-                appearance: "none",
-                maxWidth: "40%",
-                boxSizing: "border-box",
-                backgroundColor: "lightyellow",
-                borderColor: "goldenrod",
-              }}
-            />
+            <label className="flex items-center gap-3 px-5 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl shadow-sm cursor-pointer hover:bg-yellow-100 transition-all">
+              <span className="text-xl">📅</span>
+              <span className="text-sm font-bold text-blue-900 capitalize">
+                {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+              <input
+                type="date"
+                value={slotDate}
+                onChange={(e) => setSlotDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="sr-only"
+              />
+            </label>
           </div>
 
           {isMobile ? (
