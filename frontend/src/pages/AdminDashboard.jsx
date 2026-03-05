@@ -619,7 +619,6 @@ export default function AdminDashboard() {
                                       👤 {n}
                                     </span>
                                   ))}
-                                  {/* slot admin: mostra giocatori dal extendedProps se presenti */}
                                   {(e.extendedProps?.players || []).map(
                                     (n, i) => (
                                       <span
@@ -632,6 +631,39 @@ export default function AdminDashboard() {
                                   )}
                                 </div>
                               </div>
+                              {/* Bottone cancella */}
+                              <button
+                                onClick={async () => {
+                                  const label = style.label;
+                                  if (
+                                    !window.confirm(
+                                      `Rimuovere: ${label}\n${startT} - ${endT}?`,
+                                    )
+                                  )
+                                    return;
+                                  try {
+                                    if (type === "booking") {
+                                      await api.patch(
+                                        `/api/bookings/${e.id}/cancel`,
+                                      );
+                                    } else {
+                                      await api.delete(
+                                        `/api/blocked-slots/${e.extendedProps?.blockedSlotId}`,
+                                      );
+                                    }
+                                    fetchData();
+                                  } catch (err) {
+                                    alert(
+                                      err.response?.data?.msg ||
+                                        "Errore rimozione",
+                                    );
+                                  }
+                                }}
+                                className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
+                                title="Rimuovi"
+                              >
+                                ✕ Cancella
+                              </button>
                             </div>
                           );
                         })}
