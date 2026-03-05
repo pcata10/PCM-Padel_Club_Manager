@@ -444,8 +444,13 @@ app.post("/api/blocked-slots", auth, adminOnly, async (req, res) => {
   const start = toDate(startTime);
   const end = toDate(endTime);
   const filteredPlayers = players.filter((p) => p?.trim());
-  if (filteredPlayers.length === 0)
+  if (type === "blocked" && filteredPlayers.length === 0)
     return res.status(400).json({ msg: "Inserire almeno un giocatore" });
+  if ((type === "academy" || type === "lesson") && !note?.trim())
+    return res
+      .status(400)
+      .json({ msg: "La nota è obbligatoria per Academy e Lezione" });
+
   const overlap = await Booking.findOne({
     court,
     status: "confirmed",

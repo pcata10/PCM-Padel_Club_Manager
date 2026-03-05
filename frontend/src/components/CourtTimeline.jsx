@@ -19,7 +19,7 @@ const TYPE_COLORS = {
     text: "text-white",
     border: "border-purple-600",
   },
-  blocked: { bg: "bg-gray-400", text: "text-white", border: "border-gray-500" }, // ← grigio
+  blocked: { bg: "bg-red-400", text: "text-white", border: "border-red-500" }, // ← grigio
 };
 
 const TYPE_LABELS = {

@@ -270,16 +270,16 @@ export default function AdminDashboard() {
 
   const saveBlockedSlot = async () => {
     const filteredPlayers = blockPlayers.filter((p) => p.trim());
-    if (modal.status === "blocked" && filteredPlayers.length === 0) {
-      alert("⚠️ Inserire almeno il nome del primo giocatore");
-      return;
-    }
-    if (
-      (modal.status === "academy" || modal.status === "lesson") &&
-      !note.trim()
-    ) {
-      alert("⚠️ La nota è obbligatoria per Academy e Lezione");
-      return;
+    if (modal.status === "blocked") {
+      if (filteredPlayers.length === 0) {
+        alert("⚠️ Inserire almeno il nome del primo giocatore");
+        return;
+      }
+    } else if (modal.status === "academy" || modal.status === "lesson") {
+      if (!note.trim()) {
+        alert("⚠️ La nota è obbligatoria per Academy e Lezione");
+        return;
+      }
     }
     try {
       let startTime, endTime;
@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                 </table>
               </div>
             ))}
-        </div>── */}
+        </div> ── */}
 
         {/* ── GESTIONE SPONSOR ── (commentato)
         <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
