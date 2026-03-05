@@ -113,6 +113,7 @@ const EVENT_STYLE = {
     text: "text-amber-700",
   },
 };
+
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
   for (let h = 8; h <= 21.5; h += 1.5) {
@@ -269,8 +270,15 @@ export default function AdminDashboard() {
 
   const saveBlockedSlot = async () => {
     const filteredPlayers = blockPlayers.filter((p) => p.trim());
-    if (filteredPlayers.length === 0) {
+    if (modal.status === "blocked" && filteredPlayers.length === 0) {
       alert("⚠️ Inserire almeno il nome del primo giocatore");
+      return;
+    }
+    if (
+      (modal.status === "academy" || modal.status === "lesson") &&
+      !note.trim()
+    ) {
+      alert("⚠️ La nota è obbligatoria per Academy e Lezione");
       return;
     }
     try {
@@ -307,7 +315,7 @@ export default function AdminDashboard() {
         const detail = overlaps
           .map(
             (e) =>
-              `• ${labels[e.extendedProps?.type] || "Prenotazione"}: ${new Date(e.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(e.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`,
+              `• ${labels[e.extendedProps?.type] || "Evento"}: ${new Date(e.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(e.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`,
           )
           .join("\n");
         alert(
@@ -532,8 +540,7 @@ export default function AdminDashboard() {
                           {court.name}
                         </span>
                         <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-semibold">
-                          {evts.length} prenotazion
-                          {evts.length === 1 ? "e" : "i"}
+                          {evts.length} event{evts.length === 1 ? "o" : "i"}
                         </span>
                       </div>
                       <div className="divide-y divide-gray-100">
@@ -737,204 +744,124 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* ── PRENOTAZIONI CANCEsLLATE
-        // <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-        //   <div className="flex justify-between items-center mb-5">
-        //     <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-        //       🗑️ Prenotazioni Cancellate ({cancelledBookings.length})
-        //     </h2>
-        //     <button
-        //       onClick={() => setShowCancelled((prev) => !prev)}
-        //       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-all"
-        //     >
-        //       {showCancelled ? "🙈 Nascondi" : "👁 Mostra"}
-        //     </button>
-        //   </div>
-        //   {showCancelled &&
-        //     (isMobile ? (
-        //       <div className="space-y-3">
-        //         {cancelledBookings.map((booking) => (
-        //           <div
-        //             key={booking._id}
-        //             className="bg-red-50 rounded-2xl p-4 border border-red-100 opacity-80"
-        //           >
-        //             <div className="flex justify-between items-start mb-1">
-        //               <div className="font-bold text-gray-700">
-        //                 {booking.player1?.name}
-        //               </div>
-        //               <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold">
-        //                 Cancellata
-        //               </span>
-        //             </div>
-        //             <div className="text-xs text-gray-400 mb-1">
-        //               {booking.player1?.email}
-        //             </div>
-        //             <div className="text-sm text-gray-600">
-        //               🏸 {booking.court?.name}
-        //             </div>
-        //             <div className="text-sm text-gray-600">
-        //               📅{" "}
-        //               {new Date(booking.startTime).toLocaleString("it-IT", {
-        //                 weekday: "short",
-        //                 day: "2-digit",
-        //                 month: "2-digit",
-        //                 hour: "2-digit",
-        //                 minute: "2-digit",
-        //               })}
-        //             </div>
-        //             {booking.cancelledAt && (
-        //               <div className="text-xs text-red-400 mt-1">
-        //                 🗑 Cancellata il{" "}
-        //                 {new Date(booking.cancelledAt).toLocaleString("it-IT")}
-        //                 {booking.cancelledBy?.name &&
-        //                   ` da ${booking.cancelledBy.name}`}
-        //               </div>
-        //             )}
-        //           </div>
-        //         ))}
-        //         {cancelledBookings.length === 0 && (
-        //           <p className="text-center text-gray-400 py-8">
-        //             Nessuna prenotazione cancellata
-        //           </p>
-        //         )}
-        //       </div>
-        //     ) : (
-        //       <div className="overflow-x-auto rounded-2xl">
-        //         <table className="w-full text-left">
-        //           <thead className="bg-gradient-to-r from-red-400 to-rose-500 text-white">
-        //             <tr>
-        //               <th className="py-4 px-6 rounded-tl-2xl">Giocatore</th>
-        //               <th className="py-4 px-6">Campo</th>
-        //               <th className="py-4 px-6">Data prenotazione</th>
-        //               <th className="py-4 px-6">Durata</th>
-        //               <th className="py-4 px-6 rounded-tr-2xl">
-        //                 Cancellata il
-        //               </th>
-        //             </tr>
-        //           </thead>
-        //           <tbody>
-        //             {cancelledBookings.map((booking, i) => (
-        //               <tr
-        //                 key={booking._id}
-        //                 className={`border-b border-gray-100 opacity-75 ${i % 2 === 0 ? "bg-red-50/50" : "bg-white"}`}
-        //               >
-        //                 <td className="py-4 px-6 font-bold text-gray-700">
-        //                   {booking.player1?.name}
-        //                   <div className="text-xs text-gray-400 font-normal">
-        //                     {booking.player1?.email}
-        //                   </div>
-        //                 </td>
-        //                 <td className="py-4 px-6 text-gray-600">
-        //                   {booking.court?.name}
-        //                 </td>
-        //                 <td className="py-4 px-6 text-gray-600">
-        //                   {new Date(booking.startTime).toLocaleString("it-IT")}
-        //                 </td>
-        //                 <td className="py-4 px-6 text-gray-600">
-        //                   {booking.duration || "—"}
-        //                 </td>
-        //                 <td className="py-4 px-6">
-        //                   <div className="text-red-500 text-sm font-semibold">
-        //                     {booking.cancelledAt
-        //                       ? new Date(booking.cancelledAt).toLocaleString(
-        //                           "it-IT",
-        //                         )
-        //                       : "—"}
-        //                   </div>
-        //                   {booking.cancelledBy?.name && (
-        //                     <div className="text-xs text-gray-400">
-        //                       da {booking.cancelledBy.name}
-        //                     </div>
-        //                   )}
-        //                 </td>
-        //               </tr>
-        //             ))}
-        //             {cancelledBookings.length === 0 && (
-        //               <tr>
-        //                 <td
-        //                   colSpan="5"
-        //                   className="py-12 text-center text-gray-400 text-xl"
-        //                 >
-        //                   Nessuna prenotazione cancellata
-        //                 </td>
-        //               </tr>
-        //             )}
-        //           </tbody>
-        //         </table>
-        //       </div>
-        //     ))}
-        // </div>
-
-        {/* ── GESTIONE SPONSOR ── */}
-        {SHOW_SPONSORS && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
-              🏷️ Sponsor
+        {/* ── PRENOTAZIONI CANCELLATE
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">
+              🗑️ Prenotazioni Cancellate ({cancelledBookings.length})
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-              <input
-                placeholder="Nome sponsor *"
-                value={sponsorForm.name}
-                onChange={(e) =>
-                  setSponsorForm({ ...sponsorForm, name: e.target.value })
-                }
-                className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-              />
-              <input
-                placeholder="URL Logo (https://...) *"
-                value={sponsorForm.logoUrl}
-                onChange={(e) =>
-                  setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })
-                }
-                className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-              />
-              <input
-                placeholder="URL sito sponsor"
-                value={sponsorForm.linkUrl}
-                onChange={(e) =>
-                  setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })
-                }
-                className="p-3 border-2 border-gray-200 rounded-2xl text-sm"
-              />
-              <button
-                onClick={addSponsor}
-                className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600"
-              >
-                ➕ Aggiungi
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-4">
-              {sponsors.map((s) => (
-                <div
-                  key={s._id}
-                  className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border"
-                >
-                  <img
-                    src={s.logoUrl}
-                    alt={s.name}
-                    className="h-8 object-contain"
-                  />
-                  <span className="font-semibold text-gray-700 text-sm">
-                    {s.name}
-                  </span>
-                  <button
-                    onClick={() => deleteSponsor(s._id)}
-                    className="text-red-400 hover:text-red-600 text-lg font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              {sponsors.length === 0 && (
-                <p className="text-gray-400 text-sm">
-                  Nessuno sponsor aggiunto
-                </p>
-              )}
-            </div>
+            <button
+              onClick={() => setShowCancelled((prev) => !prev)}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-all"
+            >
+              {showCancelled ? "🙈 Nascondi" : "👁 Mostra"}
+            </button>
           </div>
-        )}
-      </div>
+          {showCancelled &&
+            (isMobile ? (
+              <div className="space-y-3">
+                {cancelledBookings.map((booking) => (
+                  <div key={booking._id} className="bg-red-50 rounded-2xl p-4 border border-red-100 opacity-80">
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-bold text-gray-700">{booking.player1?.name}</div>
+                      <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold">Cancellata</span>
+                    </div>
+                    <div className="text-xs text-gray-400 mb-1">{booking.player1?.email}</div>
+                    <div className="text-sm text-gray-600">🏸 {booking.court?.name}</div>
+                    <div className="text-sm text-gray-600">
+                      📅{" "}
+                      {new Date(booking.startTime).toLocaleString("it-IT", {
+                        weekday: "short", day: "2-digit", month: "2-digit",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </div>
+                    {booking.cancelledAt && (
+                      <div className="text-xs text-red-400 mt-1">
+                        🗑 Cancellata il {new Date(booking.cancelledAt).toLocaleString("it-IT")}
+                        {booking.cancelledBy?.name && ` da ${booking.cancelledBy.name}`}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {cancelledBookings.length === 0 && (
+                  <p className="text-center text-gray-400 py-8">Nessuna prenotazione cancellata</p>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl">
+                <table className="w-full text-left">
+                  <thead className="bg-gradient-to-r from-red-400 to-rose-500 text-white">
+                    <tr>
+                      <th className="py-4 px-6 rounded-tl-2xl">Giocatore</th>
+                      <th className="py-4 px-6">Campo</th>
+                      <th className="py-4 px-6">Data prenotazione</th>
+                      <th className="py-4 px-6">Durata</th>
+                      <th className="py-4 px-6 rounded-tr-2xl">Cancellata il</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cancelledBookings.map((booking, i) => (
+                      <tr key={booking._id} className={`border-b border-gray-100 opacity-75 ${i % 2 === 0 ? "bg-red-50/50" : "bg-white"}`}>
+                        <td className="py-4 px-6 font-bold text-gray-700">
+                          {booking.player1?.name}
+                          <div className="text-xs text-gray-400 font-normal">{booking.player1?.email}</div>
+                        </td>
+                        <td className="py-4 px-6 text-gray-600">{booking.court?.name}</td>
+                        <td className="py-4 px-6 text-gray-600">{new Date(booking.startTime).toLocaleString("it-IT")}</td>
+                        <td className="py-4 px-6 text-gray-600">{booking.duration || "—"}</td>
+                        <td className="py-4 px-6">
+                          <div className="text-red-500 text-sm font-semibold">
+                            {booking.cancelledAt ? new Date(booking.cancelledAt).toLocaleString("it-IT") : "—"}
+                          </div>
+                          {booking.cancelledBy?.name && (
+                            <div className="text-xs text-gray-400">da {booking.cancelledBy.name}</div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {cancelledBookings.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="py-12 text-center text-gray-400 text-xl">
+                          Nessuna prenotazione cancellata
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+        </div>── */}
 
+        {/* ── GESTIONE SPONSOR ── (commentato)
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">🏷️ Sponsor</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+            <input placeholder="Nome sponsor *" value={sponsorForm.name}
+              onChange={(e) => setSponsorForm({ ...sponsorForm, name: e.target.value })}
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
+            <input placeholder="URL Logo (https://...) *" value={sponsorForm.logoUrl}
+              onChange={(e) => setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })}
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
+            <input placeholder="URL sito sponsor" value={sponsorForm.linkUrl}
+              onChange={(e) => setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })}
+              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
+            <button onClick={addSponsor} className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600">
+              ➕ Aggiungi
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {sponsors.map((s) => (
+              <div key={s._id} className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border">
+                <img src={s.logoUrl} alt={s.name} className="h-8 object-contain" />
+                <span className="font-semibold text-gray-700 text-sm">{s.name}</span>
+                <button onClick={() => deleteSponsor(s._id)} className="text-red-400 hover:text-red-600 text-lg font-bold">✕</button>
+              </div>
+            ))}
+            {sponsors.length === 0 && <p className="text-gray-400 text-sm">Nessuno sponsor aggiunto</p>}
+          </div>
+        </div>
+        ── fine blocco GESTIONE SPONSOR commentato) */}
+      </div>
       <SponsorFooter />
 
       {/* ── MODAL ── */}
@@ -1103,35 +1030,39 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Giocatori */}
-                <div className="space-y-2 mb-5">
-                  <label className="block text-sm font-bold text-gray-700">
-                    👤 Giocatori <span className="text-red-500">*</span>
-                    <span className="text-xs font-normal text-gray-400 ml-1">
-                      (almeno 1 obbligatorio)
-                    </span>
-                  </label>
-                  {blockPlayers.map((p, i) => (
-                    <input
-                      key={i}
-                      type="text"
-                      placeholder={
-                        i === 0 ? "Nome Cognome *" : `Giocatore ${i + 1}`
-                      }
-                      value={p}
-                      onChange={(e) => {
-                        const updated = [...blockPlayers];
-                        updated[i] = e.target.value;
-                        setBlockPlayers(updated);
-                      }}
-                      className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
-                        i === 0 && !blockPlayers[0].trim()
-                          ? "border-red-300 focus:ring-red-300"
-                          : "border-gray-200 focus:ring-emerald-300"
-                      }`}
-                    />
-                  ))}
-                </div>
+                {/* Giocatori: solo per blocked */}
+                {modal.status === "blocked" && (
+                  <div className="mb-5">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      👤 Giocatori <span className="text-red-500">*</span>
+                      <span className="text-xs font-normal text-gray-400 ml-1">
+                        (almeno 1 obbligatorio)
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {blockPlayers.map((p, i) => (
+                        <input
+                          key={i}
+                          type="text"
+                          placeholder={
+                            i === 0 ? "Giocatore 1 *" : `Giocatore ${i + 1}`
+                          }
+                          value={p}
+                          onChange={(e) => {
+                            const updated = [...blockPlayers];
+                            updated[i] = e.target.value;
+                            setBlockPlayers(updated);
+                          }}
+                          className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                            i === 0 && !blockPlayers[0].trim()
+                              ? "border-red-300 focus:ring-red-300"
+                              : "border-gray-200 focus:ring-emerald-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {modal.status === "blocked" && (
                   <>
@@ -1212,18 +1143,6 @@ export default function AdminDashboard() {
                           </strong>
                         </div>
                       )}
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📝 Motivo (opzionale)
-                        </label>
-                        <input
-                          type="text"
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="es. Torneo interno, Manutenzione rete..."
-                          className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-base"
-                        />
-                      </div>
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -1308,7 +1227,7 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📝 Nota (opzionale)
+                          📝 Nota <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1319,8 +1238,17 @@ export default function AdminDashboard() {
                               ? "es. Corso Principianti"
                               : "es. Lezione Mario Rossi"
                           }
-                          className="w-full p-3 md:p-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-300 text-base"
+                          className={`w-full p-3 md:p-4 border-2 rounded-2xl focus:ring-2 text-base ${
+                            !note.trim()
+                              ? "border-red-300 focus:ring-red-300"
+                              : "border-gray-200 focus:ring-blue-300"
+                          }`}
                         />
+                        {!note.trim() && (
+                          <p className="text-xs text-red-400 mt-1 px-1">
+                            La nota è obbligatoria
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-3">
