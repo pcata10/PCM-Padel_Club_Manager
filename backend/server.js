@@ -512,12 +512,12 @@ app.get("/api/slots/:courtId", async (req, res) => {
   const slots = [];
   const startHour = ["Campo 2", "Campo 4"].includes(court.name) ? 8.5 : 8;
 
-  for (let h = startHour; h <= 21.5; h += 1.5) {
+  for (let h = startHour; h <= 21; h += 0.5) {
     const hh = Math.floor(h);
-    const mm = h % 1 === 0.5 ? 30 : 0;
+    const mm = h % 1 !== 0 ? 30 : 0;
     const timeStr = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
     const slotStart = italyTime(date, timeStr);
-    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
+    const slotEnd = new Date(slotStart.getTime() + 90 * 60 * 1000);
 
     const hasBooking = dayBookings.some(
       (b) => new Date(b.startTime) < slotEnd && new Date(b.endTime) > slotStart,

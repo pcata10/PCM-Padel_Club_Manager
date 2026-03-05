@@ -72,13 +72,14 @@ export default function Book() {
 
   const generateSlots = (courtId) => {
     const slots = [];
-    for (let h = 8; h <= 21.5; h += 1.5) {
+    for (let h = 8; h <= 21; h += 0.5) {
+      // <=21 perché l'ultimo slot 21:00 → fine 22:30
       const hh = Math.floor(h);
-      const mm = h % 1 === 0.5 ? 30 : 0;
+      const mm = h % 1 !== 0 ? 30 : 0;
       const slotStart = new Date(
         `${selectedDate}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
       );
-      const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
+      const slotEnd = new Date(slotStart.getTime() + 90 * 60000); // booking = 1h30
       const isPast = slotStart < new Date();
       const overlapping = events.find(
         (e) =>

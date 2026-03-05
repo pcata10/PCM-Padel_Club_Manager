@@ -113,16 +113,15 @@ const EVENT_STYLE = {
     text: "text-amber-700",
   },
 };
-
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
-  for (let h = 8; h <= 21.5; h += 1.5) {
+  for (let h = 8; h <= 21; h += 0.5) {
     const hh = Math.floor(h);
-    const mm = h % 1 === 0.5 ? 30 : 0;
+    const mm = h % 1 !== 0 ? 30 : 0;
     const slotStart = new Date(
       `${dateStr}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
     );
-    const slotEnd = new Date(slotStart.getTime() + 90 * 60000);
+    const slotEnd = new Date(slotStart.getTime() + 30 * 60000); // finestra 30min per overlap
     const isPast = slotStart < new Date();
     const overlapping = courtEvts.find(
       (e) => new Date(e.start) < slotEnd && new Date(e.end) > slotStart,
@@ -138,7 +137,6 @@ function buildSlots(dateStr, courtEvts) {
   }
   return slots;
 }
-
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ stats: [], courtsStats: [] });
   const [courts, setCourts] = useState([]);
