@@ -924,15 +924,31 @@ export default function AdminDashboard() {
                       {modal.event.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 text-sm w-20">📅 Data</span>
-                    <span className="font-semibold text-gray-700">
-                      {modal.event.start.toLocaleDateString("it-IT", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                      })}
-                    </span>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">
+                      Data
+                    </label>
+                    <label className="flex items-center gap-3 px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
+                      <span className="text-lg">📅</span>
+                      <span className="text-sm font-bold text-blue-900 capitalize">
+                        {new Date(slotDate + "T00:00:00").toLocaleDateString(
+                          "it-IT",
+                          {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )}
+                      </span>
+                      <input
+                        type="date"
+                        value={slotDate}
+                        onChange={(e) => setSlotDate(e.target.value)}
+                        min={new Date().toISOString().slice(0, 10)}
+                        className="sr-only"
+                      />
+                    </label>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500 text-sm w-20">
@@ -1105,21 +1121,28 @@ export default function AdminDashboard() {
                     <div className="space-y-4 mb-5">
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📅 Data
+                          Data
                         </label>
-                        <input
-                          type="date"
-                          value={slotDate}
-                          onChange={(e) => setSlotDate(e.target.value)}
-                          min={new Date().toISOString().slice(0, 10)}
-                          className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-sm"
-                          style={{
-                            WebkitAppearance: "none",
-                            appearance: "none",
-                            maxWidth: "100%",
-                            boxSizing: "border-box",
-                          }}
-                        />
+                        <label className="flex items-center gap-3 px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
+                          <span className="text-lg">📅</span>
+                          <span className="text-sm font-bold text-blue-900 capitalize">
+                            {new Date(
+                              slotDate + "T00:00:00",
+                            ).toLocaleDateString("it-IT", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <input
+                            type="date"
+                            value={slotDate}
+                            onChange={(e) => setSlotDate(e.target.value)}
+                            min={new Date().toISOString().slice(0, 10)}
+                            className="sr-only"
+                          />
+                        </label>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
