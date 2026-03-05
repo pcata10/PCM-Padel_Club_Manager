@@ -122,6 +122,9 @@ const adminOnly = async (req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 
+// Health check endpoint (aggiungi vicino all'inizio)
+app.get("/ping", (req, res) => res.send("pong"));
+
 // ── INIT ───────────────────────────────────────────────────────────
 app.get("/api/init", async (req, res) => {
   await Court.deleteMany({});
