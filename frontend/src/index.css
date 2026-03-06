@@ -5,3 +5,8 @@
 body {
     @apply bg-gradient-to-br from-slate-100 to-slate-400 min-h-screen font-sans;
 }
+input,
+select,
+textarea {
+    font-size: 16px !important;
+}
