@@ -576,7 +576,7 @@ export default function AdminDashboard() {
         {/* ── HEADER ── */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center bg-blue-800 bg-clip-text text-transparent">
-            ✏️ Dashboard Amministratore
+            ✏️ Pannello Amministratore
           </h2>
 
           {/* ── SLIDER GIORNI ── */}
