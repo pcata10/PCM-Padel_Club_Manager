@@ -126,14 +126,14 @@ function TimelineDesktop({ courts, events, onEventClick, slots, slotWidth }) {
                     />
                   ))}
                   {/* Ora corrente */}
-                  {nowLeft > 0 && nowLeft < totalWidth && (
+                  {/* {nowLeft > 0 && nowLeft < totalWidth && (
                     <div
                       className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-20"
                       style={{ left: `${nowLeft}px` }}
                     >
                       <div className="w-2 h-2 rounded-full bg-emerald-500 -translate-x-[3px] mt-1" />
                     </div>
-                  )}
+                  )}*/}
                   {/* Eventi */}
                   {courtEvents.map((event) => {
                     const type = event.extendedProps?.type || "booking";
