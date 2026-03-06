@@ -751,6 +751,18 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700 font-medium mb-3">
+                <span className="text-base">💡</span>
+                <span>
+                  Clicca su un evento nella timeline per cancellare una
+                  prenotazione o rimuovere uno slot.
+                </span>
+              </div>
+              <CourtTimeline
+                courts={sortedCourts}
+                events={dayEvents}
+                onEventClick={handleEventClick}
+              />
               {/* ── DESKTOP: timeline ── */}
               <CourtTimeline
                 courts={sortedCourts}
