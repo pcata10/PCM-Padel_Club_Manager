@@ -1472,9 +1472,7 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                     </div>
-                    <div className="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl text-sm font-bold text-center mb-4">
-                      🔒 Il campo sarà non prenotabile per l'intervallo scelto
-                    </div>
+
                     {/* DATA — readonly badge */}
                     <div className="mb-4">
                       <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
