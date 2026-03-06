@@ -438,7 +438,7 @@ export default function AdminDashboard() {
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-400">
-        <div className="text-xl text-blue-950">Caricando dashboard...</div>
+        <div className="text-xl text-blue-950">Caricamento dashboard</div>
       </div>
     );
 
