@@ -145,7 +145,7 @@ const DatePickerPill = ({ value, onChange, min }) => (
 
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
-  for (let h = 8; h <= 21; h += 0.5) {
+  for (let h = 7.5; h <= 22.5; h += 0.5) {
     const hh = Math.floor(h);
     const mm = h % 1 !== 0 ? 30 : 0;
     const slotStart = new Date(
@@ -615,7 +615,8 @@ export default function AdminDashboard() {
                           {court.name}
                         </span>
                         <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-semibold">
-                          {evts.length} event{evts.length === 1 ? "o" : "i"}
+                          {evts.length} prenotazion
+                          {evts.length === 1 ? "e" : "i"}
                         </span>
                       </div>
                       <div className="divide-y divide-gray-100">
@@ -802,8 +803,14 @@ export default function AdminDashboard() {
                           <span className="font-bold text-white">
                             {court.name}
                           </span>
-                          <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-semibold">
-                            {freeCount} liberi
+                          <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-semibold capitalize">
+                            {new Date(
+                              slotDate + "T00:00:00",
+                            ).toLocaleDateString("it-IT", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
                           </span>
                         </div>
                         <div className="p-3 grid grid-cols-4 gap-1.5">
