@@ -122,26 +122,31 @@ function getDateFromOffset(offset) {
 }
 
 // ── DatePickerPill (usato solo nei modal) ──
-const DatePickerPill = ({ value, onChange, min }) => (
-  <label className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
-    <span className="text-lg">📅</span>
-    <span className="text-sm font-bold text-blue-900 capitalize">
+const DatePickerPill = ({ value }) => (
+  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl w-fit">
+    <span className="text-sm">📅</span>
+    <span className="text-xs font-semibold text-blue-800 capitalize">
       {new Date(value + "T00:00:00").toLocaleDateString("it-IT", {
-        weekday: "long",
+        weekday: "short",
         day: "numeric",
-        month: "long",
+        month: "short",
         year: "numeric",
       })}
     </span>
-    <input
-      type="date"
-      value={value}
-      onChange={onChange}
-      min={min}
-      className="sr-only"
-    />
-  </label>
+  </div>
 );
+// Genera array di slot orari da 07:30 a 22:00, passo 30 min
+const TIME_SLOTS = [];
+for (let h = 7; h <= 21; h++) {
+  for (const m of [0, 30]) {
+    if (h === 7 && m === 0) continue; // parte da 07:30
+    TIME_SLOTS.push(
+      `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+    );
+  }
+}
+// Aggiunge 22:00 come ultimo slot
+TIME_SLOTS.push("22:00");
 
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
@@ -1312,53 +1317,37 @@ export default function AdminDashboard() {
                     <div className="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl text-sm font-bold text-center mb-4">
                       🔒 Il campo sarà non prenotabile per l'intervallo scelto
                     </div>
-                    <div className="space-y-4 mb-5">
+                    {/* DATA — readonly badge */}
+                    <div className="mb-4">
+                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                        Data
+                      </span>
+                      <DatePickerPill value={modalDate} />
+                    </div>
+
+                    {/* ORARI — readonly badges */}
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
                       <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          Data
-                        </label>
-                        <DatePickerPill
-                          value={modalDate}
-                          onChange={(e) => setModalDate(e.target.value)}
-                          min={new Date().toISOString().slice(0, 10)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1">
-                            ⏰ Dalle
-                          </label>
-                          <input
-                            type="time"
-                            value={blockStart}
-                            onChange={(e) => setBlockStart(e.target.value)}
-                            step="1800"
-                            className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-sm"
-                            style={{
-                              WebkitAppearance: "none",
-                              appearance: "none",
-                              maxWidth: "100%",
-                              boxSizing: "border-box",
-                            }}
-                          />
+                        <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                          Dalle
+                        </span>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-xl">
+                          <span className="text-sm">🕐</span>
+                          <span className="text-xs font-bold text-gray-800">
+                            {blockStart}
+                          </span>
                         </div>
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1">
-                            ⏰ Alle
-                          </label>
-                          <input
-                            type="time"
-                            value={blockEnd}
-                            onChange={(e) => setBlockEnd(e.target.value)}
-                            step="1800"
-                            className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-base"
-                            style={{
-                              WebkitAppearance: "none",
-                              appearance: "none",
-                              maxWidth: "100%",
-                              boxSizing: "border-box",
-                            }}
-                          />
+                      </div>
+                      <span className="text-gray-400 text-lg mt-4">→</span>
+                      <div>
+                        <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                          Alle
+                        </span>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-xl">
+                          <span className="text-sm">🕑</span>
+                          <span className="text-xs font-bold text-gray-800">
+                            {blockEnd}
+                          </span>
                         </div>
                       </div>
                       {blockStart && blockEnd && blockEnd > blockStart && (
@@ -1378,18 +1367,6 @@ export default function AdminDashboard() {
                           </strong>
                         </div>
                       )}
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📝 Motivo (opzionale)
-                        </label>
-                        <input
-                          type="text"
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="es. Torneo interno, Manutenzione rete..."
-                          className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-base"
-                        />
-                      </div>
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -1418,53 +1395,47 @@ export default function AdminDashboard() {
                         ? "🎓 Durata fissa: 1h 30min"
                         : "👨‍🏫 Durata fissa: 1h"}
                     </div>
-                    <div className="space-y-4 mb-5">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          Data
-                        </label>
-                        <DatePickerPill
-                          value={modalDate}
-                          onChange={(e) => setModalDate(e.target.value)}
-                          min={new Date().toISOString().slice(0, 10)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          ⏰ Orario inizio
-                        </label>
-                        <input
-                          type="time"
-                          value={slotStart}
-                          onChange={(e) => setSlotStart(e.target.value)}
-                          step="1800"
-                          className="w-full p-3 md:p-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-300 text-base"
-                          style={{
-                            WebkitAppearance: "none",
-                            appearance: "none",
-                            maxWidth: "100%",
-                            boxSizing: "border-box",
-                          }}
-                        />
-                        {slotStart && (
-                          <p className="text-sm text-gray-500 mt-2 px-1">
-                            ⏱ Fine prevista:{" "}
-                            <strong>
-                              {(() => {
-                                const [h, m] = slotStart.split(":").map(Number);
-                                const end = new Date(
-                                  0,
-                                  0,
-                                  0,
-                                  h,
-                                  m + (modal.status === "academy" ? 90 : 60),
-                                );
-                                return end.toTimeString().slice(0, 5);
-                              })()}
-                            </strong>
-                          </p>
-                        )}
-                      </div>
+                    {/* DATA — readonly badge */}
+                    <div>
+                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                        Data
+                      </span>
+                      <DatePickerPill value={modalDate} />
+                    </div>
+
+                    {/* ORARIO INIZIO — select a slot 30 min */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        Orario inizio
+                      </label>
+                      <select
+                        value={slotStart}
+                        onChange={(e) => setSlotStart(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-300 text-sm bg-white appearance-none"
+                      >
+                        {TIME_SLOTS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-sm text-gray-500 mt-2 px-1">
+                        Fine prevista:{" "}
+                        <strong>
+                          {(() => {
+                            const [h, m] = slotStart.split(":").map(Number);
+                            const end = new Date(
+                              0,
+                              0,
+                              0,
+                              h,
+                              m + (modal.status === "academy" ? 90 : 60),
+                            );
+                            return end.toTimeString().slice(0, 5);
+                          })()}
+                        </strong>
+                      </p>
+
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                           📝 Nota <span className="text-red-500">*</span>
