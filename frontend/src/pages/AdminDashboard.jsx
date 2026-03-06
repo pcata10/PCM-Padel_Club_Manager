@@ -26,7 +26,7 @@ const STATUS_CONFIG = {
     badge: "bg-green-100 text-green-700",
     icon: "✅",
   },
-  blocked: { label: "Blocca", badge: "bg-red-100 text-red-700", icon: "🔒" },
+  blocked: { label: "Prenota", badge: "bg-red-100 text-red-700", icon: "🔒" },
   academy: { label: "Academy", badge: "bg-blue-100 text-blue-700", icon: "🎓" },
   lesson: {
     label: "Lezione",
@@ -1474,10 +1474,8 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* DATA — readonly badge */}
-                    <div className="mb-4">
-                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                        Data
-                      </span>
+                    <div className="mb-3">
+                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1"></span>
                       <DatePickerPill value={modalDate} />
                     </div>
 
