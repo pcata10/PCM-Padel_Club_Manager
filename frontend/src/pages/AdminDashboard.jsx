@@ -1104,7 +1104,7 @@ export default function AdminDashboard() {
                                 }
                                 className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
                               >
-                                🗑️
+                                Cancella 🗑️
                               </button>
                             </div>
                           );
