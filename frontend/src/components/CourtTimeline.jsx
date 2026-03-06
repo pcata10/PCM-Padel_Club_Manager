@@ -104,24 +104,7 @@ function TimelineDesktop({ courts, events, onEventClick, slots, slotWidth }) {
               </div>
 
               {/* Timeline */}
-              <div
-                className="flex-1 overflow-hidden"
-                onClick={(e) => {
-                  if (!onSlotClick) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const slotIndex = Math.floor(x / slotWidth);
-                  const totalMins = START_HOUR * 60 + slotIndex * 30;
-                  // Arrotonda al blocco da 30min
-                  const roundedMins = Math.floor(totalMins / 30) * 30;
-                  const h = Math.floor(roundedMins / 60);
-                  const m = roundedMins % 60;
-                  onSlotClick?.(
-                    court,
-                    `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-                  );
-                }}
-              >
+              <div className="flex-1 overflow-hidden">
                 {" "}
                 <div
                   className="relative h-full"

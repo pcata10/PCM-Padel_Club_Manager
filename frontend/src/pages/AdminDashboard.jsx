@@ -88,7 +88,7 @@ const EVENT_STYLE = {
     bg: "bg-gray-50",
     border: "border-gray-200",
     icon: "🔒",
-    label: "Prenotato",
+    label: "Prenotazione",
     text: "text-gray-600",
   },
   academy: {
@@ -120,6 +120,75 @@ function getDateFromOffset(offset) {
   d.setDate(d.getDate() + offset);
   return d.toISOString().slice(0, 10);
 }
+const ConfirmModal = ({ data, onClose }) => {
+  if (!data) return null;
+  const colors = {
+    red: {
+      bg: "bg-red-50",
+      border: "border-red-200",
+      btn: "bg-red-500 hover:bg-red-600",
+      icon: "text-red-400",
+    },
+    blue: {
+      bg: "bg-blue-50",
+      border: "border-blue-200",
+      btn: "bg-blue-500 hover:bg-blue-600",
+      icon: "text-blue-400",
+    },
+    purple: {
+      bg: "bg-purple-50",
+      border: "border-purple-200",
+      btn: "bg-purple-500 hover:bg-purple-600",
+      icon: "text-purple-400",
+    },
+    gray: {
+      bg: "bg-gray-50",
+      border: "border-gray-200",
+      btn: "bg-gray-600 hover:bg-gray-700",
+      icon: "text-gray-400",
+    },
+  };
+  const c = colors[data.color] || colors.red;
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] px-4">
+      <div
+        className={`bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden`}
+      >
+        {/* Header colorato */}
+        <div
+          className={`${c.bg} ${c.border} border-b px-6 pt-6 pb-4 text-center`}
+        >
+          <div className={`text-5xl mb-2`}>{data.icon}</div>
+          <h3 className="text-lg font-black text-gray-800">{data.title}</h3>
+        </div>
+        {/* Body */}
+        <div className="px-6 py-4">
+          <p className="text-sm text-gray-600 text-center leading-relaxed">
+            {data.message}
+          </p>
+        </div>
+        {/* Azioni */}
+        <div className="flex gap-3 px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 text-sm transition-all"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={() => {
+              data.onConfirm();
+              onClose();
+            }}
+            className={`flex-1 py-3 text-white rounded-2xl font-bold text-sm transition-all ${c.btn}`}
+          >
+            {data.confirmLabel || "Conferma"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── DatePickerPill (usato solo nei modal) ──
 const DatePickerPill = ({ value }) => (
@@ -182,6 +251,7 @@ export default function AdminDashboard() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [cancelledBookings, setCancelledBookings] = useState([]);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   // ── Slider giorni ──
   const [dayOffset, setDayOffset] = useState(0);
@@ -383,24 +453,41 @@ export default function AdminDashboard() {
     if (type === "tournament") return;
     if (type === "academy" || type === "lesson" || type === "blocked") {
       const labels = {
-        academy: "🎓 Academy",
-        lesson: "👨‍🏫 Lezione",
-        blocked: "🔒 Campo Bloccato",
+        academy: "Academy",
+        lesson: "Lezione",
+        blocked: "Campo Bloccato",
       };
-      if (
-        window.confirm(
-          `Rimuovere questo slot?\n${labels[type]}\n${info.event.start.toLocaleString("it-IT")}`,
-        )
-      ) {
-        try {
-          await api.delete(
-            `/api/blocked-slots/${info.event.extendedProps?.blockedSlotId}`,
-          );
-          await fetchData();
-        } catch (err) {
-          alert(err.response?.data?.msg || "Errore rimozione slot");
-        }
-      }
+      const colors = { academy: "blue", lesson: "purple", blocked: "gray" };
+      const icons = { academy: "🎓", lesson: "🏫", blocked: "🔒" };
+      setConfirmModal({
+        title: `Rimuovere ${labels[type]}?`,
+        message: `${new Date(info.event.start).toLocaleDateString("it-IT", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })} · ${new Date(info.event.start).toLocaleTimeString("it-IT", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Rome",
+        })} → ${new Date(info.event.end).toLocaleTimeString("it-IT", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Rome",
+        })}`,
+        icon: icons[type],
+        color: colors[type],
+        confirmLabel: "Rimuovi",
+        onConfirm: async () => {
+          try {
+            await api.delete(
+              `/api/blocked-slots/${info.event.extendedProps?.blockedSlotId}`,
+            );
+            await fetchData();
+          } catch (err) {
+            alert(err.response?.data?.msg || "Errore rimozione slot");
+          }
+        },
+      });
     } else {
       setModal({ type: "booking", event: info.event });
     }
@@ -960,34 +1047,62 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                               <button
-                                onClick={async () => {
-                                  if (
-                                    !window.confirm(
-                                      `Rimuovere: ${style.label}\n${startT} - ${endT}?`,
-                                    )
-                                  )
-                                    return;
-                                  try {
-                                    if (type === "booking") {
-                                      await api.patch(
-                                        `/api/bookings/${e.id}/cancel`,
-                                      );
-                                    } else {
-                                      await api.delete(
-                                        `/api/blocked-slots/${e.extendedProps?.blockedSlotId}`,
-                                      );
-                                    }
-                                    fetchData();
-                                  } catch (err) {
-                                    alert(
-                                      err.response?.data?.msg ||
-                                        "Errore rimozione",
-                                    );
-                                  }
-                                }}
+                                onClick={() =>
+                                  setConfirmModal({
+                                    title:
+                                      type === "booking"
+                                        ? "Cancellare prenotazione?"
+                                        : `Rimuovere ${style.label}?`,
+                                    message: `${court.name} · ${new Date(
+                                      e.start,
+                                    ).toLocaleDateString("it-IT", {
+                                      weekday: "short",
+                                      day: "numeric",
+                                      month: "short",
+                                    })} · ${startT} → ${endT}${e.extendedProps?.note ? ` — ${e.extendedProps.note}` : ""}`,
+                                    icon:
+                                      type === "booking"
+                                        ? "🗑️"
+                                        : type === "academy"
+                                          ? "🎓"
+                                          : type === "lesson"
+                                            ? "👨‍🏫"
+                                            : "🔒",
+                                    color:
+                                      type === "booking"
+                                        ? "red"
+                                        : type === "academy"
+                                          ? "blue"
+                                          : type === "lesson"
+                                            ? "purple"
+                                            : "gray",
+                                    confirmLabel:
+                                      type === "booking"
+                                        ? "Cancella"
+                                        : "Rimuovi",
+                                    onConfirm: async () => {
+                                      try {
+                                        if (type === "booking")
+                                          await api.patch(
+                                            `/api/bookings/${e.id}/cancel`,
+                                          );
+                                        else
+                                          await api.delete(
+                                            `/api/blocked-slots/${e.extendedProps?.blockedSlotId}`,
+                                          );
+                                        fetchData();
+                                      } catch (err) {
+                                        alert(
+                                          err.response?.data?.msg ||
+                                            "Errore rimozione",
+                                        );
+                                      }
+                                    },
+                                  })
+                                }
                                 className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
                               >
-                                ✕ Cancella
+                                🗑️
                               </button>
                             </div>
                           );
@@ -1207,28 +1322,71 @@ export default function AdminDashboard() {
                     Chiudi
                   </button>
                   <button
-                    onClick={async () => {
-                      if (
-                        !window.confirm(
-                          `Cancellare la prenotazione di ${modal.event.title}?`,
-                        )
-                      )
-                        return;
-                      try {
-                        await api.patch(
-                          `/api/bookings/${modal.event.id}/cancel`,
-                        );
-                        setModal(null);
-                        fetchData();
-                      } catch (err) {
-                        alert(
-                          err.response?.data?.msg || "Errore cancellazione",
-                        );
-                      }
-                    }}
-                    className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600"
+                    onClick={() =>
+                      setConfirmModal({
+                        title:
+                          type === "booking"
+                            ? "Cancellare prenotazione?"
+                            : `Rimuovere ${style.label}?`,
+                        message: `${modal.event.title} · ${new Date(
+                          modal.event.start,
+                        ).toLocaleDateString("it-IT", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })} · ${new Date(modal.event.start).toLocaleTimeString(
+                          "it-IT",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Europe/Rome",
+                          },
+                        )} → ${new Date(modal.event.end).toLocaleTimeString(
+                          "it-IT",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Europe/Rome",
+                          },
+                        )}`,
+                        icon:
+                          type === "booking"
+                            ? "🗑️"
+                            : type === "academy"
+                              ? "🎓"
+                              : type === "lesson"
+                                ? "🏫"
+                                : "🔒",
+                        color:
+                          type === "booking"
+                            ? "red"
+                            : type === "academy"
+                              ? "blue"
+                              : type === "lesson"
+                                ? "purple"
+                                : "gray",
+                        confirmLabel:
+                          type === "booking" ? "Cancella" : "Rimuovi",
+                        onConfirm: async () => {
+                          try {
+                            if (type === "booking")
+                              await api.patch(`/api/bookings/${e.id}/cancel`);
+                            else
+                              await api.delete(
+                                `/api/blocked-slots/${e.extendedProps?.blockedSlotId}`,
+                              );
+                            fetchData();
+                          } catch (err) {
+                            alert(
+                              err.response?.data?.msg || "Errore rimozione",
+                            );
+                          }
+                        },
+                      })
+                    }
+                    className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
                   >
-                    🗑 Cancella
+                    Cancella
                   </button>
                 </div>
               </>
@@ -1479,6 +1637,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      <ConfirmModal data={confirmModal} onClose={() => setConfirmModal(null)} />
     </div>
   );
 }
