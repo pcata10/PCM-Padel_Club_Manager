@@ -758,11 +758,7 @@ export default function AdminDashboard() {
                   prenotazione o rimuovere uno slot.
                 </span>
               </div>
-              <CourtTimeline
-                courts={sortedCourts}
-                events={dayEvents}
-                onEventClick={handleEventClick}
-              />
+
               {/* ── DESKTOP: timeline ── */}
               <CourtTimeline
                 courts={sortedCourts}
