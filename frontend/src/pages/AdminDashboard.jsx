@@ -1506,7 +1506,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                       </div>
-                      {blockStart && blockEnd && blockEnd > blockStart && (
+                      {/* {blockStart && blockEnd && blockEnd > blockStart && (
                         <div className="bg-gray-50 rounded-xl px-4 py-2 text-sm text-gray-600 text-center">
                           ⏱ Durata blocco:{" "}
                           <strong>
@@ -1522,7 +1522,7 @@ export default function AdminDashboard() {
                             })()}
                           </strong>
                         </div>
-                      )}
+                      )}*/}
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -1535,7 +1535,7 @@ export default function AdminDashboard() {
                         onClick={saveBlockedSlot}
                         className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600"
                       >
-                        🔒 Blocca Campo
+                        🔒 Prenota
                       </button>
                     </div>
                   </>
