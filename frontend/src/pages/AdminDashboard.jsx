@@ -544,6 +544,254 @@ export default function AdminDashboard() {
                 const courtEvents = dayEvents.filter(
                   (e) => e.extendedProps?.courtId === court._id?.toString(),
                 );
+                // ── MOBILE TIMELINE ORIZZONTALE ──
+                function MobileCourtTimeline({
+                  courts,
+                  events,
+                  slotDate,
+                  onSlotClick,
+                }) {
+                  const START_HOUR = 8;
+                  const END_HOUR = 22;
+                  const SLOT_WIDTH = 52; // px per slot da 30min
+
+                  const slots = [];
+                  for (let h = START_HOUR; h < END_HOUR; h += 0.5) {
+                    const hh = Math.floor(h);
+                    const mm = h % 1 !== 0 ? 30 : 0;
+                    slots.push(
+                      `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
+                    );
+                  }
+
+                  const totalWidth = slots.length * SLOT_WIDTH;
+                  const now = new Date();
+                  const nowMin = now.getHours() * 60 + now.getMinutes();
+                  const nowLeft =
+                    ((nowMin - START_HOUR * 60) / 30) * SLOT_WIDTH;
+
+                  const getEventStyle = (event) => {
+                    const start = new Date(event.start);
+                    const end = new Date(event.end);
+                    const startMin = start.getHours() * 60 + start.getMinutes();
+                    const endMin = end.getHours() * 60 + end.getMinutes();
+                    const left =
+                      ((startMin - START_HOUR * 60) / 30) * SLOT_WIDTH;
+                    const width = ((endMin - startMin) / 30) * SLOT_WIDTH - 2;
+                    return { left: `${left}px`, width: `${width}px` };
+                  };
+
+                  const TYPE_COLORS = {
+                    booking: {
+                      bg: "#fee2e2",
+                      border: "#ef4444",
+                      text: "#b91c1c",
+                    },
+                    academy: {
+                      bg: "#dbeafe",
+                      border: "#3b82f6",
+                      text: "#1d4ed8",
+                    },
+                    lesson: {
+                      bg: "#f3e8ff",
+                      border: "#a855f7",
+                      text: "#7e22ce",
+                    },
+                    blocked: {
+                      bg: "#f3f4f6",
+                      border: "#9ca3af",
+                      text: "#4b5563",
+                    },
+                    tournament: {
+                      bg: "#fef3c7",
+                      border: "#f59e0b",
+                      text: "#92400e",
+                    },
+                  };
+
+                  const EVENT_LABELS = {
+                    booking: "Prenotato",
+                    academy: "Academy",
+                    lesson: "Lezione",
+                    blocked: "Bloccato",
+                    tournament: "Torneo",
+                  };
+
+                  return (
+                    <div className="space-y-3">
+                      {courts.map((court) => {
+                        const courtEvents = events.filter(
+                          (e) =>
+                            e.extendedProps?.courtId === court._id?.toString(),
+                        );
+                        const allSlots = buildSlots(slotDate, courtEvents);
+
+                        return (
+                          <div
+                            key={court._id}
+                            className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
+                          >
+                            {/* Header campo */}
+                            <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
+                              <span className="font-bold text-white text-base">
+                                {court.name}
+                              </span>
+                              <span className="text-xs text-white/80 capitalize">
+                                {new Date(
+                                  slotDate + "T00:00:00",
+                                ).toLocaleDateString("it-IT", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Timeline scrollabile */}
+                            <div
+                              className="overflow-x-auto"
+                              style={{ WebkitOverflowScrolling: "touch" }}
+                            >
+                              <div
+                                style={{
+                                  width: `${totalWidth}px`,
+                                  minHeight: "72px",
+                                }}
+                                className="relative"
+                              >
+                                {/* Griglia oraria */}
+                                {slots.map((slot, i) => (
+                                  <div
+                                    key={slot}
+                                    className={`absolute top-0 bottom-0 border-r ${slot.endsWith("00") ? "border-gray-300 bg-gray-50/50" : "border-gray-100"}`}
+                                    style={{
+                                      left: `${i * SLOT_WIDTH}px`,
+                                      width: `${SLOT_WIDTH}px`,
+                                    }}
+                                  />
+                                ))}
+
+                                {/* Labels orari (solo ore intere) */}
+                                {slots.map((slot, i) =>
+                                  slot.endsWith(":00") ? (
+                                    <div
+                                      key={slot}
+                                      className="absolute top-1 text-[9px] font-bold text-gray-400 text-center"
+                                      style={{
+                                        left: `${i * SLOT_WIDTH}px`,
+                                        width: `${SLOT_WIDTH * 2}px`,
+                                      }}
+                                    >
+                                      {slot}
+                                    </div>
+                                  ) : null,
+                                )}
+
+                                {/* Indicatore ora corrente */}
+                                {nowLeft > 0 && nowLeft < totalWidth && (
+                                  <div
+                                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-20"
+                                    style={{ left: `${nowLeft}px` }}
+                                  >
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 -translate-x-[3px] mt-1" />
+                                  </div>
+                                )}
+
+                                {/* Slot cliccabili (liberi e occupati) */}
+                                {allSlots.map((slot, i) => {
+                                  if (slot.type !== "free") return null;
+                                  return (
+                                    <div
+                                      key={slot.time}
+                                      onClick={() =>
+                                        onSlotClick(slot, court, slotDate)
+                                      }
+                                      className={`absolute bottom-1 h-8 rounded-lg border cursor-pointer transition-all
+                                        ${slot.isPast ? "opacity-25 cursor-not-allowed" : "hover:brightness-95 active:scale-95"}
+                                        bg-emerald-100 border-emerald-300`}
+                                      style={{
+                                        left: `${i * SLOT_WIDTH + 2}px`,
+                                        width: `${SLOT_WIDTH - 4}px`,
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-center h-full text-[10px] font-bold text-emerald-700">
+                                        🟢
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Eventi (booking, academy, lesson, blocked, tournament) */}
+                                {courtEvents.map((event) => {
+                                  const type =
+                                    event.extendedProps?.type || "booking";
+                                  const color =
+                                    TYPE_COLORS[type] || TYPE_COLORS.booking;
+                                  const label = EVENT_LABELS[type] || "Evento";
+                                  const style = getEventStyle(event);
+                                  return (
+                                    <div
+                                      key={event.id}
+                                      onClick={() =>
+                                        onSlotClick(
+                                          { type, isPast: false, event },
+                                          court,
+                                          slotDate,
+                                        )
+                                      }
+                                      className="absolute top-8 bottom-1 rounded-lg px-1.5 py-1 overflow-hidden z-10 cursor-pointer"
+                                      style={{
+                                        ...style,
+                                        backgroundColor: color.bg,
+                                        border: `1px solid ${color.border}`,
+                                      }}
+                                    >
+                                      <div
+                                        className="text-[10px] font-bold truncate"
+                                        style={{ color: color.text }}
+                                      >
+                                        {label}
+                                      </div>
+                                      <div className="text-[9px] truncate text-gray-500">
+                                        {new Date(
+                                          event.start,
+                                        ).toLocaleTimeString("it-IT", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                        {" → "}
+                                        {new Date(event.end).toLocaleTimeString(
+                                          "it-IT",
+                                          {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          },
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Legenda */}
+                            <div className="px-3 pb-3 pt-1 flex flex-wrap gap-2">
+                              {SLOT_LEGEND.map(({ type, label }) => (
+                                <span
+                                  key={type}
+                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
+                                >
+                                  {SLOT_ICONS[type]} {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
                 const allSlots = buildSlots(slotDate, courtEvents);
                 return (
                   <div
@@ -746,7 +994,7 @@ export default function AdminDashboard() {
               )}
               {dailySummaryByCourt.length === 0 && (
                 <div className="bg-white/70 rounded-3xl p-5 text-center text-gray-400 text-sm">
-                  Nessun evento programmato per questo giorno
+                  Nessua prenotazione per questo giorno
                 </div>
               )}
             </div>
