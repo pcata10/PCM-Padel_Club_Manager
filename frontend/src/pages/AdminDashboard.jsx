@@ -12,7 +12,6 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
-const SHOW_SPONSORS = false;
 
 const COURT_COLORS = {
   "Campo 1": { bg: "#6366f1", border: "#4f46e5" },
@@ -76,6 +75,7 @@ const SLOT_LEGEND = [
   { type: "academy", label: "Academy" },
   { type: "lesson", label: "Lezione" },
 ];
+
 const EVENT_STYLE = {
   booking: {
     bg: "bg-red-50",
@@ -113,6 +113,36 @@ const EVENT_STYLE = {
     text: "text-amber-700",
   },
 };
+
+// ── Helper: offset → stringa data YYYY-MM-DD ──
+function getDateFromOffset(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+// ── DatePickerPill (usato solo nei modal) ──
+const DatePickerPill = ({ value, onChange, min }) => (
+  <label className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
+    <span className="text-lg">📅</span>
+    <span className="text-sm font-bold text-blue-900 capitalize">
+      {new Date(value + "T00:00:00").toLocaleDateString("it-IT", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}
+    </span>
+    <input
+      type="date"
+      value={value}
+      onChange={onChange}
+      min={min}
+      className="sr-only"
+    />
+  </label>
+);
+
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
   for (let h = 8; h <= 21; h += 0.5) {
@@ -121,7 +151,7 @@ function buildSlots(dateStr, courtEvts) {
     const slotStart = new Date(
       `${dateStr}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`,
     );
-    const slotEnd = new Date(slotStart.getTime() + 30 * 60000); // finestra 30min per overlap
+    const slotEnd = new Date(slotStart.getTime() + 30 * 60000);
     const isPast = slotStart < new Date();
     const overlapping = courtEvts.find(
       (e) => new Date(e.start) < slotEnd && new Date(e.end) > slotStart,
@@ -137,6 +167,7 @@ function buildSlots(dateStr, courtEvts) {
   }
   return slots;
 }
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ stats: [], courtsStats: [] });
   const [courts, setCourts] = useState([]);
@@ -146,9 +177,11 @@ export default function AdminDashboard() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [cancelledBookings, setCancelledBookings] = useState([]);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [slotDate, setSlotDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+
+  // ── Slider giorni ──
+  const [dayOffset, setDayOffset] = useState(0);
+  const slotDate = getDateFromOffset(dayOffset);
+
   const [modal, setModal] = useState(null);
   const [note, setNote] = useState("");
   const [slotStart, setSlotStart] = useState("19:00");
@@ -247,7 +280,6 @@ export default function AdminDashboard() {
       updateCourtStatus(court._id, status, "");
     } else {
       setNote("");
-      setSlotDate(new Date().toISOString().slice(0, 10));
       setSlotStart("19:00");
       setBlockStart("19:00");
       setBlockEnd("20:30");
@@ -266,6 +298,9 @@ export default function AdminDashboard() {
     }
   };
 
+  // ── slotDate locale nel modal (può differire dallo slider) ──
+  const [modalDate, setModalDate] = useState(slotDate);
+
   const saveBlockedSlot = async () => {
     const filteredPlayers = blockPlayers.filter((p) => p.trim());
     if (modal.status === "blocked") {
@@ -282,14 +317,14 @@ export default function AdminDashboard() {
     try {
       let startTime, endTime;
       if (modal.status === "blocked") {
-        startTime = `${slotDate}T${blockStart}:00+01:00`;
-        endTime = `${slotDate}T${blockEnd}:00+01:00`;
+        startTime = `${modalDate}T${blockStart}:00+01:00`;
+        endTime = `${modalDate}T${blockEnd}:00+01:00`;
         if (endTime <= startTime) {
           alert("L'ora di fine deve essere dopo l'ora di inizio");
           return;
         }
       } else {
-        startTime = `${slotDate}T${slotStart}:00+01:00`;
+        startTime = `${modalDate}T${slotStart}:00+01:00`;
         const endDate = new Date(
           new Date(startTime).getTime() +
             (modal.status === "academy" ? 90 : 60) * 60000,
@@ -300,7 +335,9 @@ export default function AdminDashboard() {
         (e) => e.extendedProps?.courtId === modal.court._id.toString(),
       );
       const overlaps = courtEvents.filter(
-        (e) => new Date(e.start) < endTime && new Date(e.end) > startTime,
+        (e) =>
+          new Date(e.start) < new Date(endTime) &&
+          new Date(e.end) > new Date(startTime),
       );
       if (overlaps.length > 0) {
         const labels = {
@@ -370,7 +407,7 @@ export default function AdminDashboard() {
     if (slot.type === "free") {
       const end = new Date(`${dateStr}T${slot.time}:00`);
       end.setMinutes(end.getMinutes() + 90);
-      setSlotDate(dateStr);
+      setModalDate(dateStr);
       setSlotStart(slot.time);
       setBlockStart(slot.time);
       setBlockEnd(
@@ -411,7 +448,6 @@ export default function AdminDashboard() {
     a.name.localeCompare(b.name, "it", { numeric: true }),
   );
 
-  // ── Riepilogo giornaliero da dayEvents (prenotazioni + slot admin) ──
   const dailySummaryByCourt = sortedCourts
     .map((court) => {
       const courtId = court._id?.toString();
@@ -423,16 +459,39 @@ export default function AdminDashboard() {
     })
     .filter((g) => g.evts.length > 0);
 
+  // ── Genera i 21 giorni per lo slider ──
+  const days = Array.from({ length: 21 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return {
+      offset: i,
+      dateStr: d.toISOString().slice(0, 10),
+      label:
+        i === 0
+          ? "Oggi"
+          : i === 1
+            ? "Dom"
+            : d.toLocaleDateString("it-IT", { weekday: "short" }),
+      dayNum: d.getDate(),
+      month: d.toLocaleDateString("it-IT", { month: "short" }),
+    };
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-300">
       <NavBar />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-10">
-        {/* ── HEADER + DATE PICKER ── */}
+        {/* ── HEADER ── */}
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-center bg-blue-800 bg-clip-text text-transparent">
+          <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center bg-blue-800 bg-clip-text text-transparent">
             ✏️ Dashboard Amministratore
-            {/* {slotDate && (
-              <p className="text-sm text-black mt-1 px-1 capitalize font-normal">
+          </h2>
+
+          {/* ── SLIDER GIORNI ── */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-md px-4 py-4 mb-6">
+            {/* Data selezionata */}
+            <div className="text-center mb-3">
+              <p className="text-lg font-black text-blue-900 capitalize">
                 {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
                   weekday: "long",
                   day: "numeric",
@@ -440,32 +499,47 @@ export default function AdminDashboard() {
                   year: "numeric",
                 })}
               </p>
-            )}*/}
-          </h2>
-          <div className="flex justify-center mb-4">
-            <label className="flex items-center gap-3 px-5 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl shadow-sm cursor-pointer hover:bg-yellow-100 transition-all">
-              <span className="text-xl">📅</span>
-              <span className="text-sm font-bold text-blue-900 capitalize">
-                {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-              <input
-                type="date"
-                value={slotDate}
-                onChange={(e) => setSlotDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 10)}
-                className="sr-only"
-              />
-            </label>
+            </div>
+
+            {/* Pill days scroll */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
+              {days.map(({ offset, dateStr, dayNum, month }) => {
+                const isSelected = offset === dayOffset;
+                const d = new Date(dateStr + "T00:00:00");
+                const weekday = d.toLocaleDateString("it-IT", {
+                  weekday: "short",
+                });
+                return (
+                  <button
+                    key={offset}
+                    onClick={() => setDayOffset(offset)}
+                    className={`flex-shrink-0 snap-start flex flex-col items-center px-3 py-2 rounded-2xl border-2 transition-all font-bold min-w-[52px]
+                      ${
+                        isSelected
+                          ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-105"
+                          : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"
+                      }`}
+                  >
+                    <span
+                      className={`text-[10px] uppercase tracking-wide ${isSelected ? "text-blue-200" : "text-gray-400"}`}
+                    >
+                      {weekday}
+                    </span>
+                    <span className="text-base leading-tight">{dayNum}</span>
+                    <span
+                      className={`text-[10px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}
+                    >
+                      {month}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
+          {/* ── MOBILE ── */}
           {isMobile ? (
             <div className="space-y-4">
-              {/* ── Slot grid per campo ── */}
               {sortedCourts.map((court) => {
                 const courtEvents = dayEvents.filter(
                   (e) => e.extendedProps?.courtId === court._id?.toString(),
@@ -525,7 +599,7 @@ export default function AdminDashboard() {
                 );
               })}
 
-              {/* ── Riepilogo eventi del giorno per campo (MOBILE) ── */}
+              {/* Riepilogo giornaliero mobile */}
               {dailySummaryByCourt.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide px-1">
@@ -565,7 +639,6 @@ export default function AdminDashboard() {
                               timeZone: "Europe/Rome",
                             },
                           );
-                          // nomi giocatori (booking) o nota (admin slot)
                           const names = e.extendedProps?.playerNames || [];
                           const guests = e.extendedProps?.guestPlayers || [];
                           const player1 =
@@ -632,13 +705,11 @@ export default function AdminDashboard() {
                                   )}
                                 </div>
                               </div>
-                              {/* Bottone cancella */}
                               <button
                                 onClick={async () => {
-                                  const label = style.label;
                                   if (
                                     !window.confirm(
-                                      `Rimuovere: ${label}\n${startT} - ${endT}?`,
+                                      `Rimuovere: ${style.label}\n${startT} - ${endT}?`,
                                     )
                                   )
                                     return;
@@ -661,7 +732,6 @@ export default function AdminDashboard() {
                                   }
                                 }}
                                 className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
-                                title="Rimuovi"
                               >
                                 ✕ Cancella
                               </button>
@@ -673,7 +743,6 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               )}
-
               {dailySummaryByCourt.length === 0 && (
                 <div className="bg-white/70 rounded-3xl p-5 text-center text-gray-400 text-sm">
                   Nessun evento programmato per questo giorno
@@ -776,125 +845,8 @@ export default function AdminDashboard() {
             </>
           )}
         </div>
-
-        {/* ── PRENOTAZIONI CANCELLATE
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-          <div className="flex justify-between items-center mb-5">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-              🗑️ Prenotazioni Cancellate ({cancelledBookings.length})
-            </h2>
-            <button
-              onClick={() => setShowCancelled((prev) => !prev)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition-all"
-            >
-              {showCancelled ? "🙈 Nascondi" : "👁 Mostra"}
-            </button>
-          </div>
-          {showCancelled &&
-            (isMobile ? (
-              <div className="space-y-3">
-                {cancelledBookings.map((booking) => (
-                  <div key={booking._id} className="bg-red-50 rounded-2xl p-4 border border-red-100 opacity-80">
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="font-bold text-gray-700">{booking.player1?.name}</div>
-                      <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold">Cancellata</span>
-                    </div>
-                    <div className="text-xs text-gray-400 mb-1">{booking.player1?.email}</div>
-                    <div className="text-sm text-gray-600">🏸 {booking.court?.name}</div>
-                    <div className="text-sm text-gray-600">
-                      📅{" "}
-                      {new Date(booking.startTime).toLocaleString("it-IT", {
-                        weekday: "short", day: "2-digit", month: "2-digit",
-                        hour: "2-digit", minute: "2-digit",
-                      })}
-                    </div>
-                    {booking.cancelledAt && (
-                      <div className="text-xs text-red-400 mt-1">
-                        🗑 Cancellata il {new Date(booking.cancelledAt).toLocaleString("it-IT")}
-                        {booking.cancelledBy?.name && ` da ${booking.cancelledBy.name}`}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {cancelledBookings.length === 0 && (
-                  <p className="text-center text-gray-400 py-8">Nessuna prenotazione cancellata</p>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-2xl">
-                <table className="w-full text-left">
-                  <thead className="bg-gradient-to-r from-red-400 to-rose-500 text-white">
-                    <tr>
-                      <th className="py-4 px-6 rounded-tl-2xl">Giocatore</th>
-                      <th className="py-4 px-6">Campo</th>
-                      <th className="py-4 px-6">Data prenotazione</th>
-                      <th className="py-4 px-6">Durata</th>
-                      <th className="py-4 px-6 rounded-tr-2xl">Cancellata il</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cancelledBookings.map((booking, i) => (
-                      <tr key={booking._id} className={`border-b border-gray-100 opacity-75 ${i % 2 === 0 ? "bg-red-50/50" : "bg-white"}`}>
-                        <td className="py-4 px-6 font-bold text-gray-700">
-                          {booking.player1?.name}
-                          <div className="text-xs text-gray-400 font-normal">{booking.player1?.email}</div>
-                        </td>
-                        <td className="py-4 px-6 text-gray-600">{booking.court?.name}</td>
-                        <td className="py-4 px-6 text-gray-600">{new Date(booking.startTime).toLocaleString("it-IT")}</td>
-                        <td className="py-4 px-6 text-gray-600">{booking.duration || "—"}</td>
-                        <td className="py-4 px-6">
-                          <div className="text-red-500 text-sm font-semibold">
-                            {booking.cancelledAt ? new Date(booking.cancelledAt).toLocaleString("it-IT") : "—"}
-                          </div>
-                          {booking.cancelledBy?.name && (
-                            <div className="text-xs text-gray-400">da {booking.cancelledBy.name}</div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {cancelledBookings.length === 0 && (
-                      <tr>
-                        <td colSpan="5" className="py-12 text-center text-gray-400 text-xl">
-                          Nessuna prenotazione cancellata
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-        </div> ── */}
-
-        {/* ── GESTIONE SPONSOR ── (commentato)
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">🏷️ Sponsor</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-            <input placeholder="Nome sponsor *" value={sponsorForm.name}
-              onChange={(e) => setSponsorForm({ ...sponsorForm, name: e.target.value })}
-              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
-            <input placeholder="URL Logo (https://...) *" value={sponsorForm.logoUrl}
-              onChange={(e) => setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })}
-              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
-            <input placeholder="URL sito sponsor" value={sponsorForm.linkUrl}
-              onChange={(e) => setSponsorForm({ ...sponsorForm, linkUrl: e.target.value })}
-              className="p-3 border-2 border-gray-200 rounded-2xl text-sm" />
-            <button onClick={addSponsor} className="py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600">
-              ➕ Aggiungi
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            {sponsors.map((s) => (
-              <div key={s._id} className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border">
-                <img src={s.logoUrl} alt={s.name} className="h-8 object-contain" />
-                <span className="font-semibold text-gray-700 text-sm">{s.name}</span>
-                <button onClick={() => deleteSponsor(s._id)} className="text-red-400 hover:text-red-600 text-lg font-bold">✕</button>
-              </div>
-            ))}
-            {sponsors.length === 0 && <p className="text-gray-400 text-sm">Nessuno sponsor aggiunto</p>}
-          </div>
-        </div>
-        ── fine blocco GESTIONE SPONSOR commentato) */}
       </div>
+
       <SponsorFooter />
 
       {/* ── MODAL ── */}
@@ -923,32 +875,6 @@ export default function AdminDashboard() {
                     <span className="font-bold text-gray-800">
                       {modal.event.title}
                     </span>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                      Data
-                    </label>
-                    <label className="flex items-center gap-3 px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
-                      <span className="text-lg">📅</span>
-                      <span className="text-sm font-bold text-blue-900 capitalize">
-                        {new Date(slotDate + "T00:00:00").toLocaleDateString(
-                          "it-IT",
-                          {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          },
-                        )}
-                      </span>
-                      <input
-                        type="date"
-                        value={slotDate}
-                        onChange={(e) => setSlotDate(e.target.value)}
-                        min={new Date().toISOString().slice(0, 10)}
-                        className="sr-only"
-                      />
-                    </label>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500 text-sm w-20">
@@ -1043,10 +969,18 @@ export default function AdminDashboard() {
             {/* SLOT: blocked / academy / lesson */}
             {modal.type !== "booking" && (
               <>
-                <h3 className="text-xl md:text-2xl font-bold mb-1 text-gray-800">
-                  {STATUS_CONFIG[modal.status].icon}{" "}
-                  {STATUS_CONFIG[modal.status].label}
-                </h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-xl md:text-2xl font-bold text-gray-800">
+                    {STATUS_CONFIG[modal.status].icon}{" "}
+                    {STATUS_CONFIG[modal.status].label}
+                  </h3>
+                  <button
+                    onClick={() => setModal(null)}
+                    className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
                 <p className="text-gray-500 mb-5 text-sm md:text-base">
                   Campo: <strong>{modal.court.name}</strong>
                 </p>
@@ -1079,42 +1013,39 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Giocatori: solo per blocked */}
-                {modal.status === "blocked" && (
-                  <div className="mb-5">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      👤 Giocatori <span className="text-red-500">*</span>
-                      <span className="text-xs font-normal text-gray-400 ml-1">
-                        (almeno 1 obbligatorio)
-                      </span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {blockPlayers.map((p, i) => (
-                        <input
-                          key={i}
-                          type="text"
-                          placeholder={
-                            i === 0 ? "Giocatore 1 *" : `Giocatore ${i + 1}`
-                          }
-                          value={p}
-                          onChange={(e) => {
-                            const updated = [...blockPlayers];
-                            updated[i] = e.target.value;
-                            setBlockPlayers(updated);
-                          }}
-                          className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
-                            i === 0 && !blockPlayers[0].trim()
-                              ? "border-red-300 focus:ring-red-300"
-                              : "border-gray-200 focus:ring-emerald-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+                {/* ── BLOCKED ── */}
                 {modal.status === "blocked" && (
                   <>
+                    <div className="mb-5">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        👤 Giocatori <span className="text-red-500">*</span>
+                        <span className="text-xs font-normal text-gray-400 ml-1">
+                          (almeno 1 obbligatorio)
+                        </span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {blockPlayers.map((p, i) => (
+                          <input
+                            key={i}
+                            type="text"
+                            placeholder={
+                              i === 0 ? "Giocatore 1 *" : `Giocatore ${i + 1}`
+                            }
+                            value={p}
+                            onChange={(e) => {
+                              const updated = [...blockPlayers];
+                              updated[i] = e.target.value;
+                              setBlockPlayers(updated);
+                            }}
+                            className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                              i === 0 && !blockPlayers[0].trim()
+                                ? "border-red-300 focus:ring-red-300"
+                                : "border-gray-200 focus:ring-emerald-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                     <div className="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl text-sm font-bold text-center mb-4">
                       🔒 Il campo sarà non prenotabile per l'intervallo scelto
                     </div>
@@ -1123,26 +1054,11 @@ export default function AdminDashboard() {
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                           Data
                         </label>
-                        <label className="flex items-center gap-3 px-4 py-3 bg-yellow-50 border-2 border-yellow-400 rounded-2xl cursor-pointer hover:bg-yellow-100 transition-all">
-                          <span className="text-lg">📅</span>
-                          <span className="text-sm font-bold text-blue-900 capitalize">
-                            {new Date(
-                              slotDate + "T00:00:00",
-                            ).toLocaleDateString("it-IT", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })}
-                          </span>
-                          <input
-                            type="date"
-                            value={slotDate}
-                            onChange={(e) => setSlotDate(e.target.value)}
-                            min={new Date().toISOString().slice(0, 10)}
-                            className="sr-only"
-                          />
-                        </label>
+                        <DatePickerPill
+                          value={modalDate}
+                          onChange={(e) => setModalDate(e.target.value)}
+                          min={new Date().toISOString().slice(0, 10)}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -1199,6 +1115,18 @@ export default function AdminDashboard() {
                           </strong>
                         </div>
                       )}
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                          📝 Motivo (opzionale)
+                        </label>
+                        <input
+                          type="text"
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="es. Torneo interno, Manutenzione rete..."
+                          className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-300 text-base"
+                        />
+                      </div>
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -1217,6 +1145,7 @@ export default function AdminDashboard() {
                   </>
                 )}
 
+                {/* ── ACADEMY / LESSON ── */}
                 {(modal.status === "academy" || modal.status === "lesson") && (
                   <>
                     <div
@@ -1229,20 +1158,12 @@ export default function AdminDashboard() {
                     <div className="space-y-4 mb-5">
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📅 Data
+                          Data
                         </label>
-                        <input
-                          type="date"
-                          value={slotDate}
-                          onChange={(e) => setSlotDate(e.target.value)}
+                        <DatePickerPill
+                          value={modalDate}
+                          onChange={(e) => setModalDate(e.target.value)}
                           min={new Date().toISOString().slice(0, 10)}
-                          className="w-full p-3 md:p-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-300 text-base"
-                          style={{
-                            WebkitAppearance: "none",
-                            appearance: "none",
-                            maxWidth: "100%",
-                            boxSizing: "border-box",
-                          }}
                         />
                       </div>
                       <div>
@@ -1294,11 +1215,7 @@ export default function AdminDashboard() {
                               ? "es. Corso Principianti"
                               : "es. Lezione Mario Rossi"
                           }
-                          className={`w-full p-3 md:p-4 border-2 rounded-2xl focus:ring-2 text-base ${
-                            !note.trim()
-                              ? "border-red-300 focus:ring-red-300"
-                              : "border-gray-200 focus:ring-blue-300"
-                          }`}
+                          className={`w-full p-3 md:p-4 border-2 rounded-2xl focus:ring-2 text-base ${!note.trim() ? "border-red-300 focus:ring-red-300" : "border-gray-200 focus:ring-blue-300"}`}
                         />
                         {!note.trim() && (
                           <p className="text-xs text-red-400 mt-1 px-1">
