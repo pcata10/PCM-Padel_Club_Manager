@@ -1056,9 +1056,7 @@ export default function AdminDashboard() {
 
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-2 mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500 text-sm w-20">
-                      👤 Giocatore
-                    </span>
+                    <span className="text-gray-500 text-sm w-20"></span>
                     <span className="font-bold text-gray-800">
                       {modal.event.title}
                     </span>
