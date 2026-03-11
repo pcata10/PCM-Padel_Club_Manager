@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                                     e.extendedProps?.players ||
                                     [];
                                   setEditPlayers(
-                                    [...currentPlayers, "", "", ""].slice(0, 3),
+                                    [...currentPlayers, "", "", ""].slice(0, 4),
                                   );
                                   setEditingPlayers(true);
                                   setModal({
@@ -1161,7 +1161,7 @@ export default function AdminDashboard() {
                             modal.event.extendedProps?.players ||
                             [];
                           setEditPlayers(
-                            [...currentPlayers, "", "", ""].slice(0, 3),
+                            [...currentPlayers, "", "", ""].slice(0, 4),
                           );
                           setEditingPlayers(true);
                         }}
