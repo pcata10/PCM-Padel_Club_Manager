@@ -741,6 +741,16 @@ app.get("/api/admin/report", auth, adminOnly, async (req, res) => {
       ).toFixed(1),
       academySessions: academySlots.length,
       lessonSessions: lessonSlots.length,
+      lessons: lessonSlots
+        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+        .map((l) => ({
+          date: l.startTime,
+          note: l.note || "",
+          hours: +(
+            (new Date(l.endTime) - new Date(l.startTime)) /
+            3600000
+          ).toFixed(1),
+        })),
     };
   });
 

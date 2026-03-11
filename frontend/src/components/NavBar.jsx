@@ -54,7 +54,7 @@ export default function NavBar() {
                 Admin
               </Link>
             )}
-            {role === "" && (
+            {role === "admin" && (
               <Link
                 to="/report"
                 className="px-6 py-2 bg-indigo-400 text-white rounded-xl font-semibold shadow-md hover:bg-indigo-600 hover:-translate-y-0.5 transition-all"
@@ -115,6 +115,14 @@ export default function NavBar() {
                 className="flex items-center gap-3 px-4 py-3 bg-purple-500 text-white rounded-2xl font-semibold w-full hover:bg-purple-600 transition-all"
               >
                 ⚙️ Admin Dashboard
+              </Link>
+            )}
+            {role === "admin" && (
+              <Link
+                to="/report"
+                className="px-6 py-2 bg-indigo-400 text-white rounded-xl font-semibold shadow-md hover:bg-indigo-600 hover:-translate-y-0.5 transition-all"
+              >
+                Report
               </Link>
             )}
             <button
