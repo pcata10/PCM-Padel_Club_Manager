@@ -120,6 +120,14 @@ function getDateFromOffset(offset) {
   return d.toISOString().slice(0, 10);
 }
 
+// ── Helper: converte sempre in Date e formatta orario ──
+const toTime = (d) =>
+  new Date(d).toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Rome",
+  });
+
 const ConfirmModal = ({ data, onClose }) => {
   if (!data) return null;
   const colors = {
@@ -212,7 +220,7 @@ TIME_SLOTS.push("22:00");
 
 function buildSlots(dateStr, courtEvts) {
   const slots = [];
-  for (let h = 7.5; h <= 22.5; h += 0.5) {
+  for (let h = 8; h < 22; h += 0.5) {
     const hh = Math.floor(h);
     const mm = h % 1 !== 0 ? 30 : 0;
     const slotStart = new Date(
@@ -245,6 +253,9 @@ export default function AdminDashboard() {
   const [cancelledBookings, setCancelledBookings] = useState([]);
   const [showCancelled, setShowCancelled] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [editingPlayers, setEditingPlayers] = useState(false);
+  const [editPlayers, setEditPlayers] = useState([]);
+  const [editGuests, setEditGuests] = useState([]);
   const [dayOffset, setDayOffset] = useState(0);
   const slotDate = getDateFromOffset(dayOffset);
   const [modal, setModal] = useState(null);
@@ -261,6 +272,11 @@ export default function AdminDashboard() {
     order: 0,
   });
   const [modalDate, setModalDate] = useState(slotDate);
+
+  const closeModal = () => {
+    setModal(null);
+    setEditingPlayers(false);
+  };
 
   const fetchSponsors = async () => {
     const res = await api.get("/api/sponsors");
@@ -357,7 +373,7 @@ export default function AdminDashboard() {
   const updateCourtStatus = async (courtId, status, blockedNote = "") => {
     try {
       await api.put(`/api/admin/courts/${courtId}`, { status, blockedNote });
-      setModal(null);
+      closeModal();
       fetchData();
     } catch {
       alert("Errore aggiornamento campo");
@@ -413,7 +429,7 @@ export default function AdminDashboard() {
         const detail = overlaps
           .map(
             (e) =>
-              `• ${labels[e.extendedProps?.type] || "Evento"}: ${new Date(e.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} - ${new Date(e.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`,
+              `• ${labels[e.extendedProps?.type] || "Evento"}: ${toTime(e.start)} - ${toTime(e.end)}`,
           )
           .join("\n");
         alert(
@@ -429,7 +445,7 @@ export default function AdminDashboard() {
         note,
         players: filteredPlayers,
       });
-      setModal(null);
+      closeModal();
       fetchData();
     } catch (err) {
       alert(err.response?.data?.msg || "Errore salvataggio slot");
@@ -439,6 +455,20 @@ export default function AdminDashboard() {
   const handleEventClick = async (info) => {
     const type = info.event.extendedProps?.type;
     if (type === "tournament") return;
+
+    // blocked CON giocatori → apri modal dettaglio/modifica
+    if (type === "blocked" && info.event.extendedProps?.players?.length > 0) {
+      setModal({
+        type: "booking",
+        event: {
+          ...info.event,
+          start: new Date(info.event.start),
+          end: new Date(info.event.end),
+        },
+      });
+      return;
+    }
+
     if (type === "academy" || type === "lesson" || type === "blocked") {
       const labels = {
         academy: "Academy",
@@ -449,7 +479,7 @@ export default function AdminDashboard() {
       const icons = { academy: "🎓", lesson: "🏫", blocked: "🔒" };
       setConfirmModal({
         title: `Rimuovere ${labels[type]}?`,
-        message: `${new Date(info.event.start).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })} · ${new Date(info.event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })} → ${new Date(info.event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })}`,
+        message: `${new Date(info.event.start).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })} · ${toTime(info.event.start)} → ${toTime(info.event.end)}`,
         icon: icons[type],
         color: colors[type],
         confirmLabel: "Rimuovi",
@@ -465,7 +495,14 @@ export default function AdminDashboard() {
         },
       });
     } else {
-      setModal({ type: "booking", event: info.event });
+      setModal({
+        type: "booking",
+        event: {
+          ...info.event,
+          start: new Date(info.event.start),
+          end: new Date(info.event.end),
+        },
+      });
     }
   };
 
@@ -495,6 +532,28 @@ export default function AdminDashboard() {
           title: slot.event.title,
         },
       });
+    }
+  };
+
+  const saveEditedPlayers = async () => {
+    try {
+      const isBlocked = modal.event.extendedProps?.type === "blocked";
+      const players = editPlayers.filter((p) => p.trim());
+      if (isBlocked) {
+        await api.patch(
+          `/api/blocked-slots/${modal.event.extendedProps.blockedSlotId}/players`,
+          { players },
+        );
+      } else {
+        await api.patch(`/api/bookings/${modal.event.id}/players`, {
+          playerNames: players,
+        });
+      }
+      setEditingPlayers(false);
+      closeModal();
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.msg || "Errore salvataggio giocatori");
     }
   };
 
@@ -535,18 +594,11 @@ export default function AdminDashboard() {
     return {
       offset: i,
       dateStr: d.toISOString().slice(0, 10),
-      label:
-        i === 0
-          ? "Oggi"
-          : i === 1
-            ? "Dom"
-            : d.toLocaleDateString("it-IT", { weekday: "short" }),
       dayNum: d.getDate(),
       month: d.toLocaleDateString("it-IT", { month: "short" }),
     };
   });
 
-  // ── Componente Court Card riusabile ──
   const CourtCard = ({ court, isOutdoor = false }) => {
     const courtEvts = dayEvents.filter(
       (e) => e.extendedProps?.courtId === court._id?.toString(),
@@ -560,7 +612,10 @@ export default function AdminDashboard() {
         <div
           className={`px-4 py-3 ${headerClass} flex items-center justify-between`}
         >
-          <span className="font-bold text-white">{court.name}</span>
+          <span className="font-bold text-white">
+            {isOutdoor ? "🌤 " : "🏠 "}
+            {court.name}
+          </span>
           <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-semibold capitalize">
             {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
               weekday: "short",
@@ -606,7 +661,6 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-300">
       <NavBar />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-10">
-        {/* HEADER */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center bg-blue-800 bg-clip-text text-transparent">
             ✏️ Pannello Amministratore
@@ -731,22 +785,8 @@ export default function AdminDashboard() {
                           const type = e.extendedProps?.type || "booking";
                           const style =
                             EVENT_STYLE[type] || EVENT_STYLE.booking;
-                          const startT = new Date(e.start).toLocaleTimeString(
-                            "it-IT",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              timeZone: "Europe/Rome",
-                            },
-                          );
-                          const endT = new Date(e.end).toLocaleTimeString(
-                            "it-IT",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              timeZone: "Europe/Rome",
-                            },
-                          );
+                          const startT = toTime(e.start);
+                          const endT = toTime(e.end);
                           const names = e.extendedProps?.playerNames || [];
                           const guests = e.extendedProps?.guestPlayers || [];
                           const player1 =
@@ -814,6 +854,31 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                               <button
+                                onClick={() => {
+                                  const type =
+                                    e.extendedProps?.type || "booking";
+                                  const currentPlayers =
+                                    e.extendedProps?.playerNames ||
+                                    e.extendedProps?.players ||
+                                    [];
+                                  setEditPlayers(
+                                    [...currentPlayers, "", "", ""].slice(0, 3),
+                                  );
+                                  setEditingPlayers(true);
+                                  setModal({
+                                    type: "booking",
+                                    event: {
+                                      ...e,
+                                      start: new Date(e.start),
+                                      end: new Date(e.end),
+                                    },
+                                  });
+                                }}
+                                className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-800 transition-all text-xs font-bold"
+                              >
+                                +
+                              </button>
+                              <button
                                 onClick={() =>
                                   setConfirmModal({
                                     title:
@@ -863,7 +928,7 @@ export default function AdminDashboard() {
                                 }
                                 className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
                               >
-                                Cancella 🗑️
+                                Elimina 🗑️
                               </button>
                             </div>
                           );
@@ -881,7 +946,6 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
-              {/* Hint desktop */}
               <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700 font-medium mb-3">
                 <span className="text-base">💡</span>
                 <span>
@@ -890,14 +954,12 @@ export default function AdminDashboard() {
                 </span>
               </div>
 
-              {/* Timeline desktop */}
               <CourtTimeline
                 courts={sortedCourts}
                 events={dayEvents}
                 onEventClick={handleEventClick}
               />
 
-              {/* Campi Indoor */}
               {indoorCourts.length > 0 && (
                 <div className="space-y-3 mt-6">
                   <div className="flex items-center gap-2 px-1">
@@ -930,7 +992,6 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Campi Outdoor */}
               {outdoorCourts.length > 0 && (
                 <div className="space-y-3 mt-6">
                   <div className="flex items-center gap-2 px-1">
@@ -939,7 +1000,15 @@ export default function AdminDashboard() {
                     </span>
                     <div className="flex-1 h-px bg-orange-400"></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div
+                    className={`grid gap-4 ${
+                      outdoorCourts.length === 1
+                        ? "grid-cols-1 max-w-sm mx-auto"
+                        : outdoorCourts.length === 2
+                          ? "grid-cols-2 max-w-3xl mx-auto"
+                          : "grid-cols-3"
+                    }`}
+                  >
                     {outdoorCourts.map((court) => (
                       <CourtCard
                         key={court._id}
@@ -951,7 +1020,6 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Bottone Aggiorna */}
               <div className="flex justify-center mt-4">
                 <button
                   onClick={fetchData}
@@ -971,7 +1039,7 @@ export default function AdminDashboard() {
       {modal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-3xl p-6 md:p-8 shadow-2xl max-w-md w-full overflow-y-auto max-h-[90vh]">
-            {/* BOOKING */}
+            {/* BOOKING / BLOCKED con giocatori */}
             {modal.type === "booking" && (
               <>
                 <div className="flex items-center justify-between mb-4">
@@ -979,13 +1047,14 @@ export default function AdminDashboard() {
                     🎾 Prenotazione
                   </h3>
                   <button
-                    onClick={() => setModal(null)}
+                    onClick={closeModal}
                     className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
                   >
                     ✕
                   </button>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-4 space-y-2 mb-5">
+
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-2 mb-4">
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500 text-sm w-20">
                       👤 Giocatore
@@ -999,24 +1068,39 @@ export default function AdminDashboard() {
                       ⏰ Orario
                     </span>
                     <span className="font-semibold text-gray-700">
-                      {modal.event.start.toLocaleTimeString("it-IT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                      {" → "}
-                      {modal.event.end?.toLocaleTimeString("it-IT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {toTime(modal.event.start)} {" → "}{" "}
+                      {toTime(modal.event.end)}
                     </span>
                   </div>
-                  {modal.event.extendedProps?.playerNames?.length > 0 && (
+                  {(modal.event.extendedProps?.playerNames?.length > 0 ||
+                    modal.event.extendedProps?.guestPlayers?.length > 0 ||
+                    modal.event.extendedProps?.players?.length > 0) && (
                     <div className="pt-2 border-t border-gray-200">
-                      <div className="text-gray-500 text-sm mb-1">
-                        👥 Altri giocatori
+                      <div className="text-gray-500 text-xs mb-1">
+                        👥 Giocatori
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {modal.event.extendedProps.playerNames.map(
+                        {(modal.event.extendedProps?.playerNames || []).map(
+                          (name, i) => (
+                            <span
+                              key={i}
+                              className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold"
+                            >
+                              👤 {name}
+                            </span>
+                          ),
+                        )}
+                        {(modal.event.extendedProps?.guestPlayers || []).map(
+                          (name, i) => (
+                            <span
+                              key={i}
+                              className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-semibold"
+                            >
+                              👤 {name}
+                            </span>
+                          ),
+                        )}
+                        {(modal.event.extendedProps?.players || []).map(
                           (name, i) => (
                             <span
                               key={i}
@@ -1029,61 +1113,115 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
-                  {modal.event.extendedProps?.guestPlayers?.length > 0 && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="text-gray-500 text-sm mb-1">
-                        👥 Ospiti
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {modal.event.extendedProps.guestPlayers.map(
-                          (name, i) => (
-                            <span
-                              key={i}
-                              className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-semibold"
-                            >
-                              👤 {name}
-                            </span>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {!editingPlayers ? (
+                  <button
+                    onClick={() => {
+                      const currentPlayers =
+                        modal.event.extendedProps?.playerNames ||
+                        modal.event.extendedProps?.players ||
+                        [];
+                      const currentGuests =
+                        modal.event.extendedProps?.guestPlayers || [];
+                      setEditPlayers(
+                        [...currentPlayers, "", "", ""].slice(0, 4),
+                      );
+                      setEditGuests([...currentGuests, "", ""].slice(0, 2));
+                      setEditingPlayers(true);
+                    }}
+                    className="w-full mb-4 py-2.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-2xl font-semibold text-sm hover:bg-blue-100 transition-all"
+                  >
+                    ✏️ Modifica giocatori
+                  </button>
+                ) : (
+                  <div className="mb-4 space-y-2 bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                      👥 Giocatori (max 4)
+                    </p>
+                    {editPlayers.map((p, i) => (
+                      <input
+                        key={i}
+                        type="text"
+                        value={p}
+                        onChange={(e) => {
+                          const u = [...editPlayers];
+                          u[i] = e.target.value;
+                          setEditPlayers(u);
+                        }}
+                        placeholder={`Giocatore ${i + 1}`}
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                      />
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const currentPlayers =
+                            modal.event.extendedProps?.playerNames ||
+                            modal.event.extendedProps?.players ||
+                            [];
+                          setEditPlayers(
+                            [...currentPlayers, "", "", ""].slice(0, 3),
+                          );
+                          setEditingPlayers(true);
+                        }}
+                        className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-2xl font-bold text-sm hover:bg-gray-200"
+                      >
+                        Annulla
+                      </button>
+                      <button
+                        onClick={saveEditedPlayers}
+                        className="flex-1 py-2 bg-blue-500 text-white rounded-2xl font-bold text-sm hover:bg-blue-600"
+                      >
+                        💾 Salva
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setModal(null)}
+                    onClick={closeModal}
                     className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200"
                   >
                     Chiudi
                   </button>
                   <button
                     onClick={() => {
-                      const evType =
-                        modal.event.extendedProps?.type || "booking";
+                      const isBlocked =
+                        modal.event.extendedProps?.type === "blocked";
                       setConfirmModal({
-                        title: "Cancellare prenotazione?",
-                        message: `${modal.event.title} · ${new Date(modal.event.start).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })} · ${new Date(modal.event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })} → ${new Date(modal.event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })}`,
+                        title: isBlocked
+                          ? "Rimuovere slot?"
+                          : "Cancellare prenotazione?",
+                        message: `${modal.event.title} · ${new Date(modal.event.start).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })} · ${toTime(modal.event.start)} → ${toTime(modal.event.end)}`,
                         icon: "🗑️",
                         color: "red",
-                        confirmLabel: "Cancella",
+                        confirmLabel: isBlocked ? "Rimuovi" : "Cancella",
                         onConfirm: async () => {
                           try {
-                            await api.patch(
-                              `/api/bookings/${modal.event.id}/cancel`,
-                            );
-                            setModal(null);
+                            if (isBlocked)
+                              await api.delete(
+                                `/api/blocked-slots/${modal.event.extendedProps?.blockedSlotId}`,
+                              );
+                            else
+                              await api.patch(
+                                `/api/bookings/${modal.event.id}/cancel`,
+                              );
+                            closeModal();
                             fetchData();
                           } catch (err) {
-                            alert(
-                              err.response?.data?.msg || "Errore cancellazione",
-                            );
+                            alert(err.response?.data?.msg || "Errore");
                           }
                         },
                       });
                     }}
                     className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600"
                   >
-                    🗑️ Cancella
+                    🗑️{" "}
+                    {modal.event.extendedProps?.type === "blocked"
+                      ? "Rimuovi"
+                      : "Cancella"}
                   </button>
                 </div>
               </>
@@ -1098,7 +1236,7 @@ export default function AdminDashboard() {
                     {STATUS_CONFIG[modal.status]?.label}
                   </h3>
                   <button
-                    onClick={() => setModal(null)}
+                    onClick={closeModal}
                     className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
                   >
                     ✕
@@ -1114,7 +1252,19 @@ export default function AdminDashboard() {
                       <button
                         key={s}
                         onClick={() => setModal({ ...modal, status: s })}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${modal.status === s ? (s === "blocked" ? "bg-red-500 text-white" : s === "academy" ? "bg-blue-500 text-white" : "bg-purple-500 text-white") : s === "blocked" ? "bg-red-100 text-red-700" : s === "academy" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                          modal.status === s
+                            ? s === "blocked"
+                              ? "bg-red-500 text-white"
+                              : s === "academy"
+                                ? "bg-blue-500 text-white"
+                                : "bg-purple-500 text-white"
+                            : s === "blocked"
+                              ? "bg-red-100 text-red-700"
+                              : s === "academy"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-purple-100 text-purple-700"
+                        }`}
                       >
                         {STATUS_CONFIG[s].icon}
                         <br />
@@ -1124,7 +1274,6 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* BLOCKED */}
                 {modal.status === "blocked" && (
                   <>
                     <div className="mb-5">
@@ -1186,7 +1335,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setModal(null)}
+                        onClick={closeModal}
                         className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200"
                       >
                         Annulla
@@ -1201,7 +1350,6 @@ export default function AdminDashboard() {
                   </>
                 )}
 
-                {/* ACADEMY / LESSON */}
                 {(modal.status === "academy" || modal.status === "lesson") && (
                   <>
                     <div
@@ -1272,7 +1420,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setModal(null)}
+                        onClick={closeModal}
                         className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200"
                       >
                         Annulla

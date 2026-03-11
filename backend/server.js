@@ -253,6 +253,35 @@ app.get("/api/admin/players", auth, adminOnly, async (req, res) => {
     res.status(500).json({ msg: "Errore", error: err.message });
   }
 });
+app.patch("/api/bookings/:id/players", auth, async (req, res) => {
+  try {
+    const { playerNames, guestPlayers } = req.body;
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { playerNames, guestPlayers },
+      { new: true },
+    );
+    if (!booking)
+      return res.status(404).json({ msg: "Prenotazione non trovata" });
+    res.json(booking);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore aggiornamento giocatori" });
+  }
+});
+app.patch("/api/blocked-slots/:id/players", auth, async (req, res) => {
+  try {
+    const { players } = req.body;
+    const slot = await BlockedSlot.findByIdAndUpdate(
+      req.params.id,
+      { players },
+      { new: true },
+    );
+    if (!slot) return res.status(404).json({ msg: "Slot non trovato" });
+    res.json(slot);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore aggiornamento giocatori" });
+  }
+});
 
 // ── AVAILABILITY ──────────────────────────────────────────────────
 app.get("/api/availability", async (req, res) => {
