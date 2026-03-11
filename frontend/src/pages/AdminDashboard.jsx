@@ -901,10 +901,10 @@ export default function AdminDashboard() {
               {indoorCourts.length > 0 && (
                 <div className="space-y-3 mt-6">
                   <div className="flex items-center gap-2 px-1">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">
                       🏠 Campi Indoor
                     </span>
-                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <div className="flex-1 h-px bg-blue-400"></div>
                   </div>
                   <div
                     className={`grid gap-4 ${
@@ -937,7 +937,7 @@ export default function AdminDashboard() {
                     <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">
                       🌤 Campi Esterni
                     </span>
-                    <div className="flex-1 h-px bg-orange-200"></div>
+                    <div className="flex-1 h-px bg-orange-400"></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {outdoorCourts.map((court) => (
