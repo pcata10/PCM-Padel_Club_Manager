@@ -178,73 +178,6 @@ export default function Report() {
               </h2>
 
               {/* Mobile → cards */}
-              {/* ── DETTAGLIO LEZIONI COACH ── */}
-              {report.courtStats.some((c) => c.lessons?.length > 0) && (
-                <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
-                  <h2 className="text-xl md:text-2xl font-bold mb-6 text-gray-800">
-                    👨‍🏫 Dettaglio Lezioni Coach
-                  </h2>
-                  <div className="space-y-5">
-                    {report.courtStats
-                      .filter((c) => c.lessons?.length > 0)
-                      .map((court) => (
-                        <div key={court.courtName}>
-                          {/* Header campo */}
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm font-bold text-purple-700 uppercase tracking-wide">
-                              {court.courtName}
-                            </span>
-                            <div className="flex-1 h-px bg-purple-200"></div>
-                            <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-semibold">
-                              {court.lessonHours}h · {court.lessonSessions}{" "}
-                              session{court.lessonSessions === 1 ? "e" : "i"}
-                            </span>
-                          </div>
-                          {/* Lista lezioni */}
-                          <div className="space-y-1.5">
-                            {court.lessons.map((l, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-2xl px-4 py-2.5"
-                              >
-                                <span className="text-base">👨‍🏫</span>
-                                <span className="text-xs text-gray-400 w-32 flex-shrink-0">
-                                  {new Date(l.date).toLocaleDateString(
-                                    "it-IT",
-                                    {
-                                      weekday: "short",
-                                      day: "numeric",
-                                      month: "short",
-                                    },
-                                  )}
-                                  {" · "}
-                                  {new Date(l.date).toLocaleTimeString(
-                                    "it-IT",
-                                    {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      timeZone: "Europe/Rome",
-                                    },
-                                  )}
-                                </span>
-                                <span className="font-semibold text-purple-800 text-sm flex-1">
-                                  {l.note || (
-                                    <span className="text-gray-400 italic font-normal">
-                                      Nessuna nota
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="text-xs bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0">
-                                  {l.hours}h
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
 
               <div className="md:hidden space-y-4">
                 {report.courtStats.map((court) => (
@@ -358,6 +291,68 @@ export default function Report() {
                 </table>
               </div>
             </div>
+
+            {/* ── DETTAGLIO LEZIONI COACH ── */}
+            {report.courtStats.some((c) => c.lessons?.length > 0) && (
+              <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 md:p-8 shadow-xl">
+                <h2 className="text-xl md:text-2xl font-bold mb-6 text-gray-800">
+                  👨‍🏫 Dettaglio Lezioni Coach
+                </h2>
+                <div className="space-y-5">
+                  {report.courtStats
+                    .filter((c) => c.lessons?.length > 0)
+                    .map((court) => (
+                      <div key={court.courtName}>
+                        {/* Header campo */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-bold text-purple-700 uppercase tracking-wide">
+                            {court.courtName}
+                          </span>
+                          <div className="flex-1 h-px bg-purple-200"></div>
+                          <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-semibold">
+                            {court.lessonHours}h · {court.lessonSessions}{" "}
+                            session{court.lessonSessions === 1 ? "e" : "i"}
+                          </span>
+                        </div>
+                        {/* Lista lezioni */}
+                        <div className="space-y-1.5">
+                          {court.lessons.map((l, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-2xl px-4 py-2.5"
+                            >
+                              <span className="text-base">👨‍🏫</span>
+                              <span className="text-xs text-gray-400 w-32 flex-shrink-0">
+                                {new Date(l.date).toLocaleDateString("it-IT", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                                {" · "}
+                                {new Date(l.date).toLocaleTimeString("it-IT", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  timeZone: "Europe/Rome",
+                                })}
+                              </span>
+                              <span className="font-semibold text-purple-800 text-sm flex-1">
+                                {l.note || (
+                                  <span className="text-gray-400 italic font-normal">
+                                    Nessuna nota
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-xs bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+                                {l.hours}h
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* ── ATTIVITÀ GIORNALIERA ── */}
             {Object.keys(report.dailyStats).length > 0 && (
