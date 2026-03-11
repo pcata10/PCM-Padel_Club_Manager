@@ -114,12 +114,12 @@ const EVENT_STYLE = {
   },
 };
 
-// ── Helper: offset → stringa data YYYY-MM-DD ──
 function getDateFromOffset(offset) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
   return d.toISOString().slice(0, 10);
 }
+
 const ConfirmModal = ({ data, onClose }) => {
   if (!data) return null;
   const colors = {
@@ -151,23 +151,18 @@ const ConfirmModal = ({ data, onClose }) => {
   const c = colors[data.color] || colors.red;
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] px-4">
-      <div
-        className={`bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden`}
-      >
-        {/* Header colorato */}
+      <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
         <div
           className={`${c.bg} ${c.border} border-b px-6 pt-6 pb-4 text-center`}
         >
-          <div className={`text-5xl mb-2`}>{data.icon}</div>
+          <div className="text-5xl mb-2">{data.icon}</div>
           <h3 className="text-lg font-black text-gray-800">{data.title}</h3>
         </div>
-        {/* Body */}
         <div className="px-6 py-4">
           <p className="text-sm text-gray-600 text-center leading-relaxed">
             {data.message}
           </p>
         </div>
-        {/* Azioni */}
         <div className="flex gap-3 px-6 pb-6">
           <button
             onClick={onClose}
@@ -190,7 +185,6 @@ const ConfirmModal = ({ data, onClose }) => {
   );
 };
 
-// ── DatePickerPill (usato solo nei modal) ──
 const DatePickerPill = ({ value }) => (
   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl w-fit">
     <span className="text-sm">📅</span>
@@ -204,17 +198,16 @@ const DatePickerPill = ({ value }) => (
     </span>
   </div>
 );
-// Genera array di slot orari da 07:30 a 22:00, passo 30 min
+
 const TIME_SLOTS = [];
 for (let h = 7; h <= 21; h++) {
   for (const m of [0, 30]) {
-    if (h === 7 && m === 0) continue; // parte da 07:30
+    if (h === 7 && m === 0) continue;
     TIME_SLOTS.push(
       `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
     );
   }
 }
-// Aggiunge 22:00 come ultimo slot
 TIME_SLOTS.push("22:00");
 
 function buildSlots(dateStr, courtEvts) {
@@ -252,11 +245,8 @@ export default function AdminDashboard() {
   const [cancelledBookings, setCancelledBookings] = useState([]);
   const [showCancelled, setShowCancelled] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
-
-  // ── Slider giorni ──
   const [dayOffset, setDayOffset] = useState(0);
   const slotDate = getDateFromOffset(dayOffset);
-
   const [modal, setModal] = useState(null);
   const [note, setNote] = useState("");
   const [slotStart, setSlotStart] = useState("19:00");
@@ -270,6 +260,7 @@ export default function AdminDashboard() {
     linkUrl: "",
     order: 0,
   });
+  const [modalDate, setModalDate] = useState(slotDate);
 
   const fetchSponsors = async () => {
     const res = await api.get("/api/sponsors");
@@ -373,9 +364,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ── slotDate locale nel modal (può differire dallo slider) ──
-  const [modalDate, setModalDate] = useState(slotDate);
-
   const saveBlockedSlot = async () => {
     const filteredPlayers = blockPlayers.filter((p) => p.trim());
     if (modal.status === "blocked") {
@@ -461,19 +449,7 @@ export default function AdminDashboard() {
       const icons = { academy: "🎓", lesson: "🏫", blocked: "🔒" };
       setConfirmModal({
         title: `Rimuovere ${labels[type]}?`,
-        message: `${new Date(info.event.start).toLocaleDateString("it-IT", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-        })} · ${new Date(info.event.start).toLocaleTimeString("it-IT", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Europe/Rome",
-        })} → ${new Date(info.event.end).toLocaleTimeString("it-IT", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Europe/Rome",
-        })}`,
+        message: `${new Date(info.event.start).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })} · ${new Date(info.event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })} → ${new Date(info.event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })}`,
         icon: icons[type],
         color: colors[type],
         confirmLabel: "Rimuovi",
@@ -553,7 +529,6 @@ export default function AdminDashboard() {
     })
     .filter((g) => g.evts.length > 0);
 
-  // ── Genera i 21 giorni per lo slider ──
   const days = Array.from({ length: 21 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
@@ -571,19 +546,74 @@ export default function AdminDashboard() {
     };
   });
 
+  // ── Componente Court Card riusabile ──
+  const CourtCard = ({ court, isOutdoor = false }) => {
+    const courtEvts = dayEvents.filter(
+      (e) => e.extendedProps?.courtId === court._id?.toString(),
+    );
+    const allSlots = buildSlots(slotDate, courtEvts);
+    const headerClass = isOutdoor
+      ? "bg-gradient-to-r from-orange-400 to-orange-600"
+      : "bg-gradient-to-r from-blue-600 to-indigo-600";
+    return (
+      <div className="bg-white/90 rounded-3xl shadow-lg overflow-hidden">
+        <div
+          className={`px-4 py-3 ${headerClass} flex items-center justify-between`}
+        >
+          <span className="font-bold text-white">{court.name}</span>
+          <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-semibold capitalize">
+            {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            })}
+          </span>
+        </div>
+        <div className="p-3 grid grid-cols-4 gap-1.5">
+          {allSlots.map((slot) => (
+            <div
+              key={slot.time}
+              onClick={() => handleSlotClick(slot, court, slotDate)}
+              className={`rounded-xl border px-1 py-1.5 text-center transition-all duration-150 ${slot.isPast ? "opacity-25" : ""} ${SLOT_STYLES_DESKTOP[slot.type]}`}
+            >
+              <div className="text-xs font-bold leading-tight">{slot.time}</div>
+              <div className="text-[10px] mt-0.5">{SLOT_ICONS[slot.type]}</div>
+            </div>
+          ))}
+        </div>
+        <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+          {SLOT_LEGEND.map(({ type, label }) => (
+            <span
+              key={type}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
+            >
+              {SLOT_ICONS[type]} {label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const indoorCourts = [...courts]
+    .filter((c) => c.status === "available" && c.type !== "outdoor")
+    .sort((a, b) => a.name.localeCompare(b.name, "it", { numeric: true }));
+  const outdoorCourts = [...courts]
+    .filter((c) => c.status === "available" && c.type === "outdoor")
+    .sort((a, b) => a.name.localeCompare(b.name, "it", { numeric: true }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-300">
       <NavBar />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 space-y-6 pb-12 pt-10">
-        {/* ── HEADER ── */}
+        {/* HEADER */}
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center bg-blue-800 bg-clip-text text-transparent">
             ✏️ Pannello Amministratore
           </h2>
 
-          {/* ── SLIDER GIORNI ── */}
+          {/* SLIDER GIORNI */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-md px-4 py-4 mb-6">
-            {/* Data selezionata */}
             <div className="text-center mb-3">
               <p className="text-lg font-black text-blue-900 capitalize">
                 {new Date(slotDate + "T00:00:00").toLocaleDateString("it-IT", {
@@ -594,8 +624,6 @@ export default function AdminDashboard() {
                 })}
               </p>
             </div>
-
-            {/* Pill days scroll */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
               {days.map(({ offset, dateStr, dayNum, month }) => {
                 const isSelected = offset === dayOffset;
@@ -607,12 +635,7 @@ export default function AdminDashboard() {
                   <button
                     key={offset}
                     onClick={() => setDayOffset(offset)}
-                    className={`flex-shrink-0 snap-start flex flex-col items-center px-3 py-2 rounded-2xl border-2 transition-all font-bold min-w-[52px]
-                      ${
-                        isSelected
-                          ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-105"
-                          : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"
-                      }`}
+                    className={`flex-shrink-0 snap-start flex flex-col items-center px-3 py-2 rounded-2xl border-2 transition-all font-bold min-w-[52px] ${isSelected ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-105" : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"}`}
                   >
                     <span
                       className={`text-[10px] uppercase tracking-wide ${isSelected ? "text-blue-200" : "text-gray-400"}`}
@@ -631,280 +654,26 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ── MOBILE ── */}
+          {/* MOBILE */}
           {isMobile ? (
             <div className="space-y-4">
               {sortedCourts.map((court) => {
                 const courtEvents = dayEvents.filter(
                   (e) => e.extendedProps?.courtId === court._id?.toString(),
                 );
-                // ── MOBILE TIMELINE ORIZZONTALE ──
-                function MobileCourtTimeline({
-                  courts,
-                  events,
-                  slotDate,
-                  onSlotClick,
-                }) {
-                  const START_HOUR = 8;
-                  const END_HOUR = 22;
-                  const SLOT_WIDTH = 52; // px per slot da 30min
-
-                  const slots = [];
-                  for (let h = START_HOUR; h < END_HOUR; h += 0.5) {
-                    const hh = Math.floor(h);
-                    const mm = h % 1 !== 0 ? 30 : 0;
-                    slots.push(
-                      `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
-                    );
-                  }
-
-                  const totalWidth = slots.length * SLOT_WIDTH;
-                  const now = new Date();
-                  const nowMin = now.getHours() * 60 + now.getMinutes();
-                  const nowLeft =
-                    ((nowMin - START_HOUR * 60) / 30) * SLOT_WIDTH;
-
-                  const getEventStyle = (event) => {
-                    const start = new Date(event.start);
-                    const end = new Date(event.end);
-                    const startMin = start.getHours() * 60 + start.getMinutes();
-                    const endMin = end.getHours() * 60 + end.getMinutes();
-                    const left =
-                      ((startMin - START_HOUR * 60) / 30) * SLOT_WIDTH;
-                    const width = ((endMin - startMin) / 30) * SLOT_WIDTH - 2;
-                    return { left: `${left}px`, width: `${width}px` };
-                  };
-
-                  const TYPE_COLORS = {
-                    booking: {
-                      bg: "#fee2e2",
-                      border: "#ef4444",
-                      text: "#b91c1c",
-                    },
-                    academy: {
-                      bg: "#dbeafe",
-                      border: "#3b82f6",
-                      text: "#1d4ed8",
-                    },
-                    lesson: {
-                      bg: "#f3e8ff",
-                      border: "#a855f7",
-                      text: "#7e22ce",
-                    },
-                    blocked: {
-                      bg: "#f3f4f6",
-                      border: "#9ca3af",
-                      text: "#4b5563",
-                    },
-                    tournament: {
-                      bg: "#fef3c7",
-                      border: "#f59e0b",
-                      text: "#92400e",
-                    },
-                  };
-
-                  const EVENT_LABELS = {
-                    booking: "Prenotato",
-                    academy: "Academy",
-                    lesson: "Lezione",
-                    blocked: "Bloccato",
-                    tournament: "Torneo",
-                  };
-
-                  return (
-                    <div className="space-y-3">
-                      {courts.map((court) => {
-                        const courtEvents = events.filter(
-                          (e) =>
-                            e.extendedProps?.courtId === court._id?.toString(),
-                        );
-                        const allSlots = buildSlots(slotDate, courtEvents);
-
-                        return (
-                          <div
-                            key={court._id}
-                            className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
-                          >
-                            {/* Header campo */}
-                            <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
-                              <span className="font-bold text-white text-base">
-                                {court.name}
-                              </span>
-                              <span className="text-xs text-white/80 capitalize">
-                                {new Date(
-                                  slotDate + "T00:00:00",
-                                ).toLocaleDateString("it-IT", {
-                                  weekday: "short",
-                                  day: "numeric",
-                                  month: "short",
-                                })}
-                              </span>
-                            </div>
-
-                            {/* Timeline scrollabile */}
-                            <div
-                              className="overflow-x-auto"
-                              style={{ WebkitOverflowScrolling: "touch" }}
-                            >
-                              <div
-                                style={{
-                                  width: `${totalWidth}px`,
-                                  minHeight: "72px",
-                                }}
-                                className="relative"
-                              >
-                                {/* Griglia oraria */}
-                                {slots.map((slot, i) => (
-                                  <div
-                                    key={slot}
-                                    className={`absolute top-0 bottom-0 border-r ${slot.endsWith("00") ? "border-gray-300 bg-gray-50/50" : "border-gray-100"}`}
-                                    style={{
-                                      left: `${i * SLOT_WIDTH}px`,
-                                      width: `${SLOT_WIDTH}px`,
-                                    }}
-                                  />
-                                ))}
-
-                                {/* Labels orari (solo ore intere) */}
-                                {slots.map((slot, i) =>
-                                  slot.endsWith(":00") ? (
-                                    <div
-                                      key={slot}
-                                      className="absolute top-1 text-[9px] font-bold text-gray-400 text-center"
-                                      style={{
-                                        left: `${i * SLOT_WIDTH}px`,
-                                        width: `${SLOT_WIDTH * 2}px`,
-                                      }}
-                                    >
-                                      {slot}
-                                    </div>
-                                  ) : null,
-                                )}
-
-                                {/* Indicatore ora corrente */}
-                                {nowLeft > 0 && nowLeft < totalWidth && (
-                                  <div
-                                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-500 z-20"
-                                    style={{ left: `${nowLeft}px` }}
-                                  >
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 -translate-x-[3px] mt-1" />
-                                  </div>
-                                )}
-
-                                {/* Slot cliccabili (liberi e occupati) */}
-                                {allSlots.map((slot, i) => {
-                                  if (slot.type !== "free") return null;
-                                  return (
-                                    <div
-                                      key={slot.time}
-                                      onClick={() =>
-                                        onSlotClick(slot, court, slotDate)
-                                      }
-                                      className={`absolute bottom-1 h-8 rounded-lg border cursor-pointer transition-all
-                                        ${slot.isPast ? "opacity-25 cursor-not-allowed" : "hover:brightness-95 active:scale-95"}
-                                        bg-emerald-100 border-emerald-300`}
-                                      style={{
-                                        left: `${i * SLOT_WIDTH + 2}px`,
-                                        width: `${SLOT_WIDTH - 4}px`,
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-center h-full text-[10px] font-bold text-emerald-700">
-                                        🟢
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-
-                                {/* Eventi (booking, academy, lesson, blocked, tournament) */}
-                                {courtEvents.map((event) => {
-                                  const type =
-                                    event.extendedProps?.type || "booking";
-                                  const color =
-                                    TYPE_COLORS[type] || TYPE_COLORS.booking;
-                                  const label = EVENT_LABELS[type] || "Evento";
-                                  const style = getEventStyle(event);
-                                  return (
-                                    <div
-                                      key={event.id}
-                                      onClick={() =>
-                                        onSlotClick(
-                                          { type, isPast: false, event },
-                                          court,
-                                          slotDate,
-                                        )
-                                      }
-                                      className="absolute top-8 bottom-1 rounded-lg px-1.5 py-1 overflow-hidden z-10 cursor-pointer"
-                                      style={{
-                                        ...style,
-                                        backgroundColor: color.bg,
-                                        border: `1px solid ${color.border}`,
-                                      }}
-                                    >
-                                      <div
-                                        className="text-[10px] font-bold truncate"
-                                        style={{ color: color.text }}
-                                      >
-                                        {label}
-                                      </div>
-                                      <div className="text-[9px] truncate text-gray-500">
-                                        {new Date(
-                                          event.start,
-                                        ).toLocaleTimeString("it-IT", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                        {" → "}
-                                        {new Date(event.end).toLocaleTimeString(
-                                          "it-IT",
-                                          {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                          },
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Legenda */}
-                            <div className="px-3 pb-3 pt-1 flex flex-wrap gap-2">
-                              {SLOT_LEGEND.map(({ type, label }) => (
-                                <span
-                                  key={type}
-                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
-                                >
-                                  {SLOT_ICONS[type]} {label}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-
                 const allSlots = buildSlots(slotDate, courtEvents);
+                const isOutdoor = court.type === "outdoor";
                 return (
                   <div
                     key={court._id}
                     className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
                   >
-                    <div className="px-4 py-3 bg-gradient-to-r from-blue-700 to-blue-950 flex items-center justify-between">
+                    <div
+                      className={`px-4 py-3 bg-gradient-to-r ${isOutdoor ? "from-orange-400 to-orange-600" : "from-blue-700 to-blue-950"} flex items-center justify-between`}
+                    >
                       <span className="font-bold text-white text-base">
+                        {isOutdoor ? "🌤 " : "🏠 "}
                         {court.name}
-                      </span>
-                      <span className="text-xs text-white/80 capitalize">
-                        {new Date(slotDate + "T00:00:00").toLocaleDateString(
-                          "it-IT",
-                          {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                          },
-                        )}
                       </span>
                     </div>
                     <div className="p-3 grid grid-cols-4 gap-1.5">
@@ -912,11 +681,7 @@ export default function AdminDashboard() {
                         <div
                           key={slot.time}
                           onClick={() => handleSlotClick(slot, court, slotDate)}
-                          className={`rounded-xl border px-1 py-1.5 text-center transition-all
-                            ${slot.isPast ? "opacity-30" : ""}
-                            ${SLOT_STYLES[slot.type]}
-                            ${slot.type === "tournament" ? "cursor-not-allowed" : ""}
-                          `}
+                          className={`rounded-xl border px-1 py-1.5 text-center transition-all ${slot.isPast ? "opacity-30" : ""} ${SLOT_STYLES[slot.type]} ${slot.type === "tournament" ? "cursor-not-allowed" : ""}`}
                         >
                           <div className="text-xs font-bold leading-tight">
                             {slot.time}
@@ -1055,13 +820,7 @@ export default function AdminDashboard() {
                                       type === "booking"
                                         ? "Cancellare prenotazione?"
                                         : `Rimuovere ${style.label}?`,
-                                    message: `${court.name} · ${new Date(
-                                      e.start,
-                                    ).toLocaleDateString("it-IT", {
-                                      weekday: "short",
-                                      day: "numeric",
-                                      month: "short",
-                                    })} · ${startT} → ${endT}${e.extendedProps?.note ? ` — ${e.extendedProps.note}` : ""}`,
+                                    message: `${court.name} · ${new Date(e.start).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })} · ${startT} → ${endT}${e.extendedProps?.note ? ` — ${e.extendedProps.note}` : ""}`,
                                     icon:
                                       type === "booking"
                                         ? "🗑️"
@@ -1116,12 +875,13 @@ export default function AdminDashboard() {
               )}
               {dailySummaryByCourt.length === 0 && (
                 <div className="bg-white/70 rounded-3xl p-5 text-center text-gray-400 text-sm">
-                  Nessua prenotazione per questo giorno
+                  Nessuna prenotazione per questo giorno
                 </div>
               )}
             </div>
           ) : (
             <>
+              {/* Hint desktop */}
               <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700 font-medium mb-3">
                 <span className="text-base">💡</span>
                 <span>
@@ -1130,95 +890,68 @@ export default function AdminDashboard() {
                 </span>
               </div>
 
-              {/* ── DESKTOP: timeline ── */}
+              {/* Timeline desktop */}
               <CourtTimeline
                 courts={sortedCourts}
                 events={dayEvents}
                 onEventClick={handleEventClick}
               />
 
-              {/* ── DESKTOP: slot grid ── */}
-              <div
-                className={`mt-6 grid gap-4 ${
-                  courts.filter((c) => c.status === "available").length === 1
-                    ? "grid-cols-1 max-w-sm mx-auto"
-                    : courts.filter((c) => c.status === "available").length ===
-                        2
-                      ? "grid-cols-2 max-w-2xl mx-auto"
-                      : courts.filter((c) => c.status === "available")
-                            .length === 3
-                        ? "grid-cols-3"
-                        : "grid-cols-2 xl:grid-cols-4"
-                }`}
-              >
-                {[...courts]
-                  .filter((c) => c.status === "available")
-                  .sort((a, b) =>
-                    a.name.localeCompare(b.name, "it", { numeric: true }),
-                  )
-                  .map((court) => {
-                    const courtEvts = dayEvents.filter(
-                      (e) => e.extendedProps?.courtId === court._id?.toString(),
-                    );
-                    const allSlots = buildSlots(slotDate, courtEvts);
-                    const freeCount = allSlots.filter(
-                      (s) => !s.isPast && s.type === "free",
-                    ).length;
-                    return (
-                      <div
+              {/* Campi Indoor */}
+              {indoorCourts.length > 0 && (
+                <div className="space-y-3 mt-6">
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      🏠 Campi Indoor
+                    </span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
+                  <div
+                    className={`grid gap-4 ${
+                      indoorCourts.length === 1
+                        ? "grid-cols-1 max-w-sm mx-auto"
+                        : indoorCourts.length === 2
+                          ? "grid-cols-2 max-w-3xl mx-auto"
+                          : indoorCourts.length === 3
+                            ? "grid-cols-3"
+                            : indoorCourts.length === 4
+                              ? "grid-cols-4"
+                              : "grid-cols-2 xl:grid-cols-4"
+                    }`}
+                  >
+                    {indoorCourts.map((court) => (
+                      <CourtCard
                         key={court._id}
-                        className="bg-white/90 rounded-3xl shadow-lg overflow-hidden"
-                      >
-                        <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between">
-                          <span className="font-bold text-white">
-                            {court.name}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-semibold capitalize">
-                            {new Date(
-                              slotDate + "T00:00:00",
-                            ).toLocaleDateString("it-IT", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </span>
-                        </div>
-                        <div className="p-3 grid grid-cols-4 gap-1.5">
-                          {allSlots.map((slot) => (
-                            <div
-                              key={slot.time}
-                              onClick={() =>
-                                handleSlotClick(slot, court, slotDate)
-                              }
-                              className={`rounded-xl border px-1 py-1.5 text-center transition-all duration-150
-                                ${slot.isPast ? "opacity-25" : ""}
-                                ${SLOT_STYLES_DESKTOP[slot.type]}
-                              `}
-                            >
-                              <div className="text-xs font-bold leading-tight">
-                                {slot.time}
-                              </div>
-                              <div className="text-[10px] mt-0.5">
-                                {SLOT_ICONS[slot.type]}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="px-3 pb-3 flex flex-wrap gap-1.5">
-                          {SLOT_LEGEND.map(({ type, label }) => (
-                            <span
-                              key={type}
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${SLOT_STYLES[type]}`}
-                            >
-                              {SLOT_ICONS[type]} {label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
+                        court={court}
+                        isOutdoor={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
+              {/* Campi Outdoor */}
+              {outdoorCourts.length > 0 && (
+                <div className="space-y-3 mt-6">
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">
+                      🌤 Campi Esterni
+                    </span>
+                    <div className="flex-1 h-px bg-orange-200"></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {outdoorCourts.map((court) => (
+                      <CourtCard
+                        key={court._id}
+                        court={court}
+                        isOutdoor={true}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bottone Aggiorna */}
               <div className="flex justify-center mt-4">
                 <button
                   onClick={fetchData}
@@ -1234,7 +967,7 @@ export default function AdminDashboard() {
 
       <SponsorFooter />
 
-      {/* ── MODAL ── */}
+      {/* MODAL */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-3xl p-6 md:p-8 shadow-2xl max-w-md w-full overflow-y-auto max-h-[90vh]">
@@ -1324,71 +1057,33 @@ export default function AdminDashboard() {
                     Chiudi
                   </button>
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      const evType =
+                        modal.event.extendedProps?.type || "booking";
                       setConfirmModal({
-                        title:
-                          type === "booking"
-                            ? "Cancellare prenotazione?"
-                            : `Rimuovere ${style.label}?`,
-                        message: `${modal.event.title} · ${new Date(
-                          modal.event.start,
-                        ).toLocaleDateString("it-IT", {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                        })} · ${new Date(modal.event.start).toLocaleTimeString(
-                          "it-IT",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            timeZone: "Europe/Rome",
-                          },
-                        )} → ${new Date(modal.event.end).toLocaleTimeString(
-                          "it-IT",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            timeZone: "Europe/Rome",
-                          },
-                        )}`,
-                        icon:
-                          type === "booking"
-                            ? "🗑️"
-                            : type === "academy"
-                              ? "🎓"
-                              : type === "lesson"
-                                ? "🏫"
-                                : "🔒",
-                        color:
-                          type === "booking"
-                            ? "red"
-                            : type === "academy"
-                              ? "blue"
-                              : type === "lesson"
-                                ? "purple"
-                                : "gray",
-                        confirmLabel:
-                          type === "booking" ? "Cancella" : "Rimuovi",
+                        title: "Cancellare prenotazione?",
+                        message: `${modal.event.title} · ${new Date(modal.event.start).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })} · ${new Date(modal.event.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })} → ${new Date(modal.event.end).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })}`,
+                        icon: "🗑️",
+                        color: "red",
+                        confirmLabel: "Cancella",
                         onConfirm: async () => {
                           try {
-                            if (type === "booking")
-                              await api.patch(`/api/bookings/${e.id}/cancel`);
-                            else
-                              await api.delete(
-                                `/api/blocked-slots/${e.extendedProps?.blockedSlotId}`,
-                              );
+                            await api.patch(
+                              `/api/bookings/${modal.event.id}/cancel`,
+                            );
+                            setModal(null);
                             fetchData();
                           } catch (err) {
                             alert(
-                              err.response?.data?.msg || "Errore rimozione",
+                              err.response?.data?.msg || "Errore cancellazione",
                             );
                           }
                         },
-                      })
-                    }
-                    className="ml-1 mt-0.5 flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-500 hover:text-red-700 transition-all text-xs font-bold"
+                      });
+                    }}
+                    className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600"
                   >
-                    Cancella
+                    🗑️ Cancella
                   </button>
                 </div>
               </>
@@ -1399,8 +1094,8 @@ export default function AdminDashboard() {
               <>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-xl md:text-2xl font-bold text-gray-800">
-                    {STATUS_CONFIG[modal.status].icon}{" "}
-                    {STATUS_CONFIG[modal.status].label}
+                    {STATUS_CONFIG[modal.status]?.icon}{" "}
+                    {STATUS_CONFIG[modal.status]?.label}
                   </h3>
                   <button
                     onClick={() => setModal(null)}
@@ -1410,7 +1105,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <p className="text-gray-500 mb-5 text-sm md:text-base">
-                  Campo: <strong>{modal.court.name}</strong>
+                  Campo: <strong>{modal.court?.name}</strong>
                 </p>
 
                 {modal.mobileSlot && (
@@ -1419,19 +1114,7 @@ export default function AdminDashboard() {
                       <button
                         key={s}
                         onClick={() => setModal({ ...modal, status: s })}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
-                          modal.status === s
-                            ? s === "blocked"
-                              ? "bg-red-500 text-white"
-                              : s === "academy"
-                                ? "bg-blue-500 text-white"
-                                : "bg-purple-500 text-white"
-                            : s === "blocked"
-                              ? "bg-red-100 text-red-700"
-                              : s === "academy"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-purple-100 text-purple-700"
-                        }`}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${modal.status === s ? (s === "blocked" ? "bg-red-500 text-white" : s === "academy" ? "bg-blue-500 text-white" : "bg-purple-500 text-white") : s === "blocked" ? "bg-red-100 text-red-700" : s === "academy" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}
                       >
                         {STATUS_CONFIG[s].icon}
                         <br />
@@ -1441,7 +1124,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* ── BLOCKED ── */}
+                {/* BLOCKED */}
                 {modal.status === "blocked" && (
                   <>
                     <div className="mb-5">
@@ -1465,23 +1148,17 @@ export default function AdminDashboard() {
                               updated[i] = e.target.value;
                               setBlockPlayers(updated);
                             }}
-                            className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${
-                              i === 0 && !blockPlayers[0].trim()
-                                ? "border-red-300 focus:ring-red-300"
-                                : "border-gray-200 focus:ring-emerald-300"
-                            }`}
+                            className={`w-full p-2.5 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 ${i === 0 && !blockPlayers[0].trim() ? "border-red-300 focus:ring-red-300" : "border-gray-200 focus:ring-emerald-300"}`}
                           />
                         ))}
                       </div>
                     </div>
-
-                    {/* DATA — readonly badge */}
                     <div className="mb-3">
-                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1"></span>
+                      <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                        Data
+                      </span>
                       <DatePickerPill value={modalDate} />
                     </div>
-
-                    {/* ORARI — readonly badges */}
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
                       <div>
                         <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
@@ -1506,23 +1183,6 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                       </div>
-                      {/* {blockStart && blockEnd && blockEnd > blockStart && (
-                        <div className="bg-gray-50 rounded-xl px-4 py-2 text-sm text-gray-600 text-center">
-                          ⏱ Durata blocco:{" "}
-                          <strong>
-                            {(() => {
-                              const [hs, ms] = blockStart
-                                .split(":")
-                                .map(Number);
-                              const [he, me] = blockEnd.split(":").map(Number);
-                              const mins = he * 60 + me - (hs * 60 + ms);
-                              return mins >= 60
-                                ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}min` : ""}`
-                                : `${mins}min`;
-                            })()}
-                          </strong>
-                        </div>
-                      )}*/}
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -1541,7 +1201,7 @@ export default function AdminDashboard() {
                   </>
                 )}
 
-                {/* ── ACADEMY / LESSON ── */}
+                {/* ACADEMY / LESSON */}
                 {(modal.status === "academy" || modal.status === "lesson") && (
                   <>
                     <div
@@ -1551,16 +1211,13 @@ export default function AdminDashboard() {
                         ? "🎓 Durata fissa: 1h 30min"
                         : "👨‍🏫 Durata fissa: 1h"}
                     </div>
-                    {/* DATA — readonly badge */}
-                    <div>
+                    <div className="mb-3">
                       <span className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                         Data
                       </span>
                       <DatePickerPill value={modalDate} />
                     </div>
-
-                    {/* ORARIO INIZIO — select a slot 30 min */}
-                    <div>
+                    <div className="mb-4">
                       <label className="block text-sm font-bold text-gray-700 mb-1">
                         Orario inizio
                       </label>
@@ -1591,28 +1248,27 @@ export default function AdminDashboard() {
                           })()}
                         </strong>
                       </p>
-
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                          📝 Nota <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder={
-                            modal.status === "academy"
-                              ? "es. Corso Principianti"
-                              : "es. Lezione Mario Rossi"
-                          }
-                          className={`w-full p-3 md:p-4 border-2 rounded-2xl focus:ring-2 text-base ${!note.trim() ? "border-red-300 focus:ring-red-300" : "border-gray-200 focus:ring-blue-300"}`}
-                        />
-                        {!note.trim() && (
-                          <p className="text-xs text-red-400 mt-1 px-1">
-                            La nota è obbligatoria
-                          </p>
-                        )}
-                      </div>
+                    </div>
+                    <div className="mb-5">
+                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        📝 Nota <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder={
+                          modal.status === "academy"
+                            ? "es. Corso Principianti"
+                            : "es. Lezione Mario Rossi"
+                        }
+                        className={`w-full p-3 md:p-4 border-2 rounded-2xl focus:ring-2 text-base ${!note.trim() ? "border-red-300 focus:ring-red-300" : "border-gray-200 focus:ring-blue-300"}`}
+                      />
+                      {!note.trim() && (
+                        <p className="text-xs text-red-400 mt-1 px-1">
+                          La nota è obbligatoria
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-3">
                       <button

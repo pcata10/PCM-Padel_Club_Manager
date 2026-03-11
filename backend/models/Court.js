@@ -1,14 +1,19 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 
-const CourtSchema = new mongoose.Schema({
-  name: String,
-  type: { type: String, enum: [] },
-  status: {
-    type: String,
-    enum: ['available', 'maintenance', 'academy', 'lesson'],
-    default: 'available'
+const CourtSchema = new mongoose.Schema(
+  {
+    name: { type: String },
+    type: { type: String, enum: ["indoor", "outdoor"], default: "indoor" },
+    order: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ["available", "maintenance", "academy", "lesson"],
+      default: "available",
+    },
+    blockedNote: { type: String, default: "" },
   },
-  blockedNote: { type: String, default: '' }  // ← nota opzionale (es. "Corso Principianti")
-})
+  { timestamps: true },
+);
 
-module.exports = mongoose.models.Court || mongoose.model('Court', CourtSchema)
+// ← CAMBIA QUESTA RIGA (rimuovi il controllo mongoose.models.Court):
+module.exports = mongoose.model("Court", CourtSchema);

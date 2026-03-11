@@ -84,8 +84,22 @@ function DesktopTimeline({ courts, events, slots, slotWidth }) {
             >
               {/* Label campo */}
               <div className="w-28 flex-shrink-0 px-2 py-2 border-r-2 border-gray-200 flex flex-col justify-center">
-                <div className="font-bold text-gray-800 text-xs leading-tight">
+                <div
+                  className={`font-bold text-xs leading-tight px-1.5 py-0.5 rounded-md ${
+                    court.type === "outdoor"
+                      ? "bg-orange-500 text-white"
+                      : "text-gray-800"
+                  }`}
+                >
                   {court.name}
+                  {court.type === "outdoor" && (
+                    <span
+                      className="block text-orange-100 font-normal"
+                      style={{ fontSize: "9px" }}
+                    >
+                      🌤 Esterno
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -194,8 +208,13 @@ function MobileTimeline({ courts, events }) {
             key={court._id}
             className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl overflow-hidden"
           >
-            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500">
-              <div className="font-bold text-white text-base">{court.name}</div>
+            <div
+              className={`flex items-center justify-between px-5 py-3 bg-gradient-to-r ${
+                court.type === "outdoor"
+                  ? "from-orange-400 to-orange-600"
+                  : "from-emerald-500 to-teal-500"
+              }`}
+            >
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                   court.status === "available"

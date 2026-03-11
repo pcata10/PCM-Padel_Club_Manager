@@ -126,10 +126,23 @@ const PORT = process.env.PORT || 4000;
 app.get("/ping", (req, res) => res.send("pong"));
 
 // ── INIT ───────────────────────────────────────────────────────────
+// PRIMA:
+
+// DOPO:
 app.get("/api/init", async (req, res) => {
-  await Court.deleteMany({});
-  await Court.insertMany(config.courts.map((name) => ({ name })));
-  res.json({ msg: "Dati inizializzati" });
+  try {
+    console.log("config.courts:", JSON.stringify(config.courts, null, 2));
+    await Court.deleteMany();
+    await Court.insertMany(
+      config.courts.map((c) =>
+        typeof c === "string" ? { name: c, type: "indoor", order: 0 } : c,
+      ),
+    );
+    res.json({ msg: "Dati inizializzati" });
+  } catch (err) {
+    console.error("INIT ERROR:", err.message);
+    res.status(500).json({ msg: "Errore init", error: err.message });
+  }
 });
 
 // ── CONFIG ─────────────────────────────────────────────────────────
@@ -150,46 +163,46 @@ app.get("/api/config", (req, res) => {
 });
 
 // ── AUTH ───────────────────────────────────────────────────────────
-// app.post("/api/register", async (req, res) => {
-//   try {
-//     const { email, password, name, level, hand } = req.body;
-//     const existing = await Player.findOne({
-//       email: email.trim().toLowerCase(),
-//     });
-//     if (existing) return res.status(400).json({ msg: "Email già registrata" });
-//     const hashed = await bcrypt.hash(password, 10);
-//     const player = new Player({
-//       email: email.trim().toLowerCase(),
-//       password: hashed,
-//       name,
-//       level,
-//       hand,
-//     });
-//     await player.save();
-//     const token = jwt.sign(
-//       { id: player._id, role: player.role },
-//       process.env.JWT_SECRET,
-//     );
-//     res.json({
-//       token,
-//       player: {
-//         id: player._id,
-//         email: player.email,
-//         name,
-//         level,
-//         role: player.role,
-//       },
-//     });
-//   } catch (err) {
-//     res.status(500).json({ msg: "Errore registrazione", error: err.message });
-//   }
-// });
-//
-app.post("/api/register", (req, res) => {
-  res.status(403).json({
-    msg: "Registrazione pubblica disabilitata. Contatta l'amministratore.",
-  });
+app.post("/api/register", async (req, res) => {
+  try {
+    const { email, password, name, level, hand } = req.body;
+    const existing = await Player.findOne({
+      email: email.trim().toLowerCase(),
+    });
+    if (existing) return res.status(400).json({ msg: "Email già registrata" });
+    const hashed = await bcrypt.hash(password, 10);
+    const player = new Player({
+      email: email.trim().toLowerCase(),
+      password: hashed,
+      name,
+      level,
+      hand,
+    });
+    await player.save();
+    const token = jwt.sign(
+      { id: player._id, role: player.role },
+      process.env.JWT_SECRET,
+    );
+    res.json({
+      token,
+      player: {
+        id: player._id,
+        email: player.email,
+        name,
+        level,
+        role: player.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Errore registrazione", error: err.message });
+  }
 });
+
+// app.post("/api/register", (req, res) => {
+//   res.status(403).json({
+//     msg: "Registrazione pubblica disabilitata. Contatta l'amministratore.",
+//   });
+// });
 
 app.post("/api/login", async (req, res) => {
   try {
@@ -217,9 +230,9 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ── COURTS ────────────────────────────────────────────────────────
-app.get("/api/courts", async (req, res) => {
-  res.json(await Court.find());
-});
+app.get("/api/courts", async (req, res) =>
+  res.json(await Court.find().sort({ order: 1, name: 1 })),
+);
 
 app.put("/api/admin/courts/:id", auth, adminOnly, async (req, res) => {
   const court = await Court.findByIdAndUpdate(req.params.id, req.body, {

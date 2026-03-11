@@ -18,6 +18,7 @@ const getRole = () => {
 function App() {
   const navigate = useNavigate();
   const config = useConfig(); // ← aggiunto
+  const location = useLocation(); // ← aggiungi
 
   useEffect(() => {
     const token = localStorage.getItem("token");
