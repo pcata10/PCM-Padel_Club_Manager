@@ -122,7 +122,7 @@ export default function NavBar() {
                 to="/report"
                 className="flex items-center gap-3 px-4 py-3 bg-indigo-400 text-white rounded-xl font-semibold shadow-md hover:bg-indigo-600  transition-all"
               >
-                Report
+                📝 Report
               </Link>
             )}
             <button
