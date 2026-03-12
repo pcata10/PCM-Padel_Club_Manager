@@ -83,7 +83,7 @@
     <td align="center" width="50%">
       <img src="docs/screenshots/report.png" alt="Report Mensile" /><br/>
       <strong>Report Mensile</strong><br/>
-      <sub>KPI cards con prenotazioni, incasso, ore Academy e Lezioni</sub>
+      <sub>KPI cards con prenotazioni, incasso, ore Academy e Lezioni per gli ADMIN</sub>
     </td>
   </tr>
 </table>
