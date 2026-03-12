@@ -714,19 +714,25 @@ app.get("/api/admin/report", auth, adminOnly, async (req, res) => {
     Court.find().lean(),
   ]);
 
+  // BlockedSlots with type "blocked" are admin-created bookings
+  const adminBookings = blockedSlots.filter((s) => s.type === "blocked");
+
   const courtStats = courts.map((court) => {
+    const courtId = court._id.toString();
     const cb = bookings.filter(
-      (b) => b.court?._id.toString() === court._id.toString(),
+      (b) => b.court?._id.toString() === courtId,
     );
     const cs = blockedSlots.filter(
-      (s) => s.court?._id.toString() === court._id.toString(),
+      (s) => s.court?._id.toString() === courtId,
     );
+    const courtAdminBookings = cs.filter((s) => s.type === "blocked");
     const academySlots = cs.filter((s) => s.type === "academy");
     const lessonSlots = cs.filter((s) => s.type === "lesson");
+    const totalCourtBookings = cb.length + courtAdminBookings.length;
     return {
       courtName: court.name,
-      bookings: cb.length,
-      revenue: cb.length * (config.slotPrice || 40),
+      bookings: totalCourtBookings,
+      revenue: totalCourtBookings * (config.slotPrice || 40),
       academyHours: +(
         academySlots.reduce(
           (a, s) => a + (new Date(s.endTime) - new Date(s.startTime)) / 60000,
@@ -754,17 +760,24 @@ app.get("/api/admin/report", auth, adminOnly, async (req, res) => {
     };
   });
 
+  // Include admin bookings (blocked slots) in daily stats
   const dailyStats = bookings.reduce((acc, b) => {
     const day = new Date(b.startTime).toISOString().slice(0, 10);
     acc[day] = (acc[day] || 0) + 1;
     return acc;
   }, {});
+  adminBookings.forEach((s) => {
+    const day = new Date(s.startTime).toISOString().slice(0, 10);
+    dailyStats[day] = (dailyStats[day] || 0) + 1;
+  });
+
+  const allBookingsCount = bookings.length + adminBookings.length;
 
   res.json({
     month,
     year,
-    totalBookings: bookings.length,
-    totalRevenue: bookings.length * (config.slotPrice || 40),
+    totalBookings: allBookingsCount,
+    totalRevenue: allBookingsCount * (config.slotPrice || 40),
     totalAcademyHours: +blockedSlots
       .filter((s) => s.type === "academy")
       .reduce(
