@@ -27,10 +27,10 @@
 ## ✨ Features
 
 ### 👤 Area Utente
-- **Registrazione e login** con autenticazione JWT
+- **Registrazione e login** con autenticazione JWT (commentata nel codice)
 - **Prenotazione campi** con visualizzazione disponibilità in tempo reale (slot da 1h30min)
 - **Dashboard personale** con le proprie prenotazioni e possibilità di cancellazione
-- **Iscrizione tornei** — singola o in coppia, con ricerca partner e registrazione ospiti
+- **Iscrizione tornei** — singola o in coppia, con ricerca partner e registrazione ospiti 
 - **Notifiche email** automatiche quando si viene aggiunti a una partita
 
 ### ⚙️ Pannello Amministratore
@@ -40,7 +40,7 @@
 - **Riepilogo giornaliero** con dettaglio eventi per campo
 - **Gestione giocatori** — lista completa, ruoli, livelli
 
-### 🏆 Gestione Tornei
+### 🏆 Gestione Tornei (commentata nel codice)
 - **Creazione e configurazione** tornei con campi, orari e livello
 - **Gestione coppie** con teste di serie e gironi
 - **Tabellone automatico** — fase Gold 🥇 e Silver 🥈 con aggiornamento risultati live
@@ -53,7 +53,7 @@
 - **Dettaglio lezioni coach** con note e ore per sessione
 - **Export PDF / Stampa** integrato
 
-### 🤝 Sponsor
+### 🤝 Sponsor (commentata nel codice)
 - Gestione sponsor con logo, link e ordinamento
 - Footer dinamico visibile su tutte le pagine
 
