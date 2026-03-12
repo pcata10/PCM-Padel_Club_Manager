@@ -78,7 +78,7 @@
     <td align="center" width="50%">
       <img src="docs/screenshots/booking-modal.png" alt="Booking Modal" /><br/>
       <strong>Prenotazione Campo</strong><br/>
-      <sub>Modal di prenotazione con tipo (Prenota/Academy/Lezione), giocatori e orario</sub>
+      <sub>Modal di prenotazione con tipo (Prenota/Academy/Lezione), giocatori e orario per gli ADMIN</sub>
     </td>
     <td align="center" width="50%">
       <img src="docs/screenshots/report.png" alt="Report Mensile" /><br/>
