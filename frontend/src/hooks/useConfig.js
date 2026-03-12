@@ -6,7 +6,7 @@ const api = axios.create({
 });
 
 const DEFAULT_CONFIG = {
-  clubName: "Padel Club",
+  clubName: "",
   clubShortName: "PC",
   currency: "€",
   slotPrice: 40,
@@ -22,7 +22,7 @@ export function useConfig() {
     api
       .get("/api/config")
       .then((res) => setConfig({ ...DEFAULT_CONFIG, ...res.data }))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   return config;
