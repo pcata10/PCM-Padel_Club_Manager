@@ -276,7 +276,7 @@ Tutti i parametri del club sono personalizzabili in `backend/config.js` o via va
 
 | Parametro | Default | Descrizione |
 |-----------|---------|-------------|
-| `CLUB_NAME` | C.T. LATIANO | Nome del club |
+| `CLUB_NAME` | Il tuo Padel Club | Nome del club |
 | `CLUB_SLOT_PRICE` | 40 | Prezzo per slot (€) |
 | `CLUB_SLOT_DURATION` | 90 | Durata slot (minuti) |
 | `CLUB_OPEN_HOUR` | 8 | Ora apertura |
