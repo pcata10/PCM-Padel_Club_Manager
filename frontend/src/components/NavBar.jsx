@@ -67,7 +67,7 @@ export default function NavBar() {
                 to="/admin/tournaments"
                 className="px-6 py-2 bg-sky-500 text-white rounded-xl font-semibold shadow-md hover:bg-sky-600 hover:-translate-y-0.5 transition-all"
               >
-                🏆 Tornei
+                Tornei
               </Link>
             )}
             <button
