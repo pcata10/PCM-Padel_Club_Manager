@@ -104,7 +104,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* REGISTRAZIONE DISABILITATA — solo admin può accedere
         <p className="text-center mt-6 text-sm text-gray-600">
           Non hai account?{" "}
           <Link
@@ -114,7 +113,6 @@ export default function Login() {
             Registrati
           </Link>
         </p>
-        */}
 
         <SponsorFooter />
       </div>
