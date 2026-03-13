@@ -855,6 +855,16 @@ app.get("/api/tournaments", auth, async (req, res) => {
   res.json(await Tournament.find().populate(T_POPULATE));
 });
 
+app.get("/api/tournaments/:id", auth, async (req, res) => {
+  try {
+    const t = await Tournament.findById(req.params.id).populate(T_POPULATE);
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+    res.json(t);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore nel caricamento del torneo", error: err.message });
+  }
+});
+
 app.post("/api/tournaments", auth, adminOnly, async (req, res) => {
   try {
     const tournament = new Tournament(req.body);
@@ -938,17 +948,19 @@ app.delete("/api/tournaments/:id/players/:playerId", auth, adminOnly, async (req
     if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
 
     // Rimuovi dai giocatori
-    t.players = t.players.filter(p => p.toString() !== req.params.playerId);
+    t.players = t.players.filter(p => p && p.toString() !== req.params.playerId);
     
     // Rimuovi anche le coppie che includono questo giocatore
-    t.couples = t.couples.filter(c => 
-      c.player1.toString() !== req.params.playerId && 
-      (!c.player2 || c.player2.toString() !== req.params.playerId)
-    );
+    t.couples = t.couples.filter(c => {
+      const p1 = c.player1?.toString();
+      const p2 = c.player2?.toString();
+      return p1 !== req.params.playerId && p2 !== req.params.playerId;
+    });
 
     await t.save();
     res.json(await Tournament.findById(t._id).populate(T_POPULATE));
   } catch (err) {
+    console.error("Error removing player:", err);
     res.status(500).json({ msg: "Errore rimozione giocatore", error: err.message });
   }
 });

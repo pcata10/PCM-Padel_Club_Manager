@@ -262,6 +262,9 @@ export default function AdminTournaments() {
   const [scoreForm, setScoreForm] = useState({ score: "", winner: "" });
 
   const [drawLoading, setDrawLoading] = useState(false);
+  
+  // modal conferma azioni
+  const [confirmAction, setConfirmAction] = useState(null); // { title, sub, onConfirm, btnText, color }
 
   // ── Fetch ────────────────────────────────────────────────────
   const fetchAll = async () => {
@@ -308,10 +311,14 @@ export default function AdminTournaments() {
   };
 
   const deleteTournament = async (id) => {
-    if (!window.confirm("Eliminare questo torneo?")) return;
-    await api.delete(`/api/tournaments/${id}`);
-    if (selectedT?._id === id) setSelectedT(null);
-    fetchAll();
+    try {
+      await api.delete(`/api/tournaments/${id}`);
+      if (selectedT?._id === id) setSelectedT(null);
+      await fetchAll();
+      setConfirmAction(null);
+    } catch (err) {
+      alert("Errore eliminazione torneo");
+    }
   };
 
   const startEdit = (t) => {
@@ -364,9 +371,13 @@ export default function AdminTournaments() {
   };
 
   const removePlayer = async (tid, playerId) => {
-    if (!window.confirm("Rimuovere il giocatore?")) return;
-    await api.delete(`/api/tournaments/${tid}/players/${playerId}`);
-    await refreshT(tid);
+    try {
+      await api.delete(`/api/tournaments/${tid}/players/${playerId}`);
+      await refreshT(tid);
+      setConfirmAction(null);
+    } catch (err) {
+      alert(err.response?.data?.msg || "Errore rimozione giocatore");
+    }
   };
 
   // ── Coppie ────────────────────────────────────────────────────
@@ -386,9 +397,13 @@ export default function AdminTournaments() {
   };
 
   const removeCouple = async (tid, coupleId) => {
-    if (!window.confirm("Rimuovere questa coppia?")) return;
-    await api.delete(`/api/tournaments/${tid}/couples/${coupleId}`);
-    await refreshT(tid);
+    try {
+      await api.delete(`/api/tournaments/${tid}/couples/${coupleId}`);
+      await refreshT(tid);
+      setConfirmAction(null);
+    } catch (err) {
+      alert(err.response?.data?.msg || "Errore rimozione coppia");
+    }
   };
 
   const toggleSeed = async (tid, coupleId, current) => {
@@ -406,17 +421,13 @@ export default function AdminTournaments() {
   const generateDraw = async (tid) => {
     const t = tournaments.find((x) => x._id === tid);
     if ((t?.couples?.length || 0) < 3) return alert("Servono almeno 3 coppie");
-    if (
-      !window.confirm(
-        "Generare il tabellone? I risultati esistenti verranno resettati.",
-      )
-    )
-      return;
+
     setDrawLoading(true);
     try {
       await api.post(`/api/tournaments/${tid}/draw`);
       await fetchAll();
       await refreshT(tid);
+      setConfirmAction(null);
     } catch (err) {
       alert(err.response?.data?.msg || "Errore generazione tabellone");
     } finally {
@@ -778,7 +789,15 @@ export default function AdminTournaments() {
                         ✏️ Modifica
                       </button>
                       <button
-                        onClick={() => deleteTournament(t._id)}
+                        onClick={() =>
+                          setConfirmAction({
+                            title: `Eliminare ${t.name}?`,
+                            sub: "Tutti i dati, iscrizioni e match verranno persi per sempre.",
+                            onConfirm: () => deleteTournament(t._id),
+                            btnText: "Sì, elimina torneo",
+                            color: "from-red-500 to-rose-600",
+                          })
+                        }
                         className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-xl font-semibold hover:bg-red-200"
                       >
                         🗑 Elimina
@@ -911,7 +930,13 @@ export default function AdminTournaments() {
                                       </button>
                                       <button
                                         onClick={() =>
-                                          removeCouple(t._id, c._id)
+                                          setConfirmAction({
+                                            title: "Rimuovere questa coppia?",
+                                            sub: `Sei sicuro di voler rimuovere la coppia "${coupleShortName(c)}"?`,
+                                            onConfirm: () => removeCouple(t._id, c._id),
+                                            btnText: "Rimuovi coppia",
+                                            color: "from-red-500 to-rose-600",
+                                          })
                                         }
                                         className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-xl font-semibold hover:bg-red-200"
                                       >
@@ -974,7 +999,15 @@ export default function AdminTournaments() {
                                       </div>
                                     </div>
                                     <button
-                                      onClick={() => removePlayer(t._id, p._id)}
+                                      onClick={() =>
+                                        setConfirmAction({
+                                          title: "Rimuovere giocatore?",
+                                          sub: `Stai per rimuovere "${playerDisplayName(p)}" dal torneo. Sarà rimosso anche da eventuali coppie.`,
+                                          onConfirm: () => removePlayer(t._id, p._id),
+                                          btnText: "Rimuovi giocatore",
+                                          color: "from-red-500 to-rose-600",
+                                        })
+                                      }
                                       className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-xl font-semibold hover:bg-red-200 ml-3"
                                     >
                                       ✕
@@ -1003,7 +1036,15 @@ export default function AdminTournaments() {
                                 )}
                               </div>
                               <button
-                                onClick={() => generateDraw(t._id)}
+                                onClick={() =>
+                                  setConfirmAction({
+                                    title: t.groups?.length > 0 ? "Rigenerare tabellone?" : "Generare tabellone?",
+                                    sub: "Tutti i risultati e i match esistenti verranno resettati.",
+                                    onConfirm: () => generateDraw(t._id),
+                                    btnText: "Genera ora",
+                                    color: "from-amber-500 to-orange-600",
+                                  })
+                                }
                                 disabled={
                                   drawLoading || (t.couples?.length || 0) < 3
                                 }
@@ -1762,6 +1803,34 @@ export default function AdminTournaments() {
                 className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl font-bold hover:from-amber-600 hover:to-yellow-600"
               >
                 💾 Salva
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════════════════════════════════════════════════════
+          MODAL: CONFERMA AZIONE
+      ══════════════════════════════════════════════════════════ */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 text-center animate-in fade-in zoom-in duration-200">
+            <div className={`text-5xl mb-4 ${confirmAction.color?.includes('amber') ? 'text-amber-500' : 'text-red-500'}`}>⚠️</div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">{confirmAction.title}</h3>
+            <p className="text-gray-500 mb-8 leading-relaxed">
+              {confirmAction.sub}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={confirmAction.onConfirm}
+                className={`w-full py-4 bg-gradient-to-r ${confirmAction.color} text-white rounded-2xl font-bold hover:shadow-lg transition-all text-lg`}
+              >
+                {confirmAction.btnText}
+              </button>
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+              >
+                Annulla
               </button>
             </div>
           </div>
