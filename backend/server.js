@@ -253,6 +253,38 @@ app.get("/api/admin/players", auth, adminOnly, async (req, res) => {
     res.status(500).json({ msg: "Errore", error: err.message });
   }
 });
+
+app.post("/api/admin/players", auth, adminOnly, async (req, res) => {
+  try {
+    const { name, surname, email, level, hand, password } = req.body;
+    if (!name) return res.status(400).json({ msg: "Nome obbligatorio" });
+
+    let finalEmail = email;
+    if (!finalEmail) {
+      finalEmail = `dummy_${Date.now()}_${Math.random().toString(36).substring(2,7)}@temp.local`;
+    }
+
+    if (email) {
+      const existing = await Player.findOne({ email: email.toLowerCase() });
+      if (existing) return res.status(400).json({ msg: "Email già registrata" });
+    }
+
+    const hashed = await bcrypt.hash(password || Math.random().toString(36).slice(-8), 10);
+    const player = new Player({
+      name,
+      surname: surname || "",
+      email: finalEmail.toLowerCase(),
+      password: hashed,
+      level: level || "intermedio",
+      hand: hand || "destra",
+    });
+
+    await player.save();
+    res.status(201).json(player);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore creazione giocatore", error: err.message });
+  }
+});
 app.patch("/api/bookings/:id/players", auth, async (req, res) => {
   try {
     const { playerNames, guestPlayers } = req.body;
@@ -900,6 +932,27 @@ app.post("/api/tournaments/:id/players", auth, async (req, res) => {
   }
 });
 
+app.delete("/api/tournaments/:id/players/:playerId", auth, adminOnly, async (req, res) => {
+  try {
+    const t = await Tournament.findById(req.params.id);
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+
+    // Rimuovi dai giocatori
+    t.players = t.players.filter(p => p.toString() !== req.params.playerId);
+    
+    // Rimuovi anche le coppie che includono questo giocatore
+    t.couples = t.couples.filter(c => 
+      c.player1.toString() !== req.params.playerId && 
+      (!c.player2 || c.player2.toString() !== req.params.playerId)
+    );
+
+    await t.save();
+    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
+  } catch (err) {
+    res.status(500).json({ msg: "Errore rimozione giocatore", error: err.message });
+  }
+});
+
 app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
   try {
     const { player1Id, player2Id, player2Guest } = req.body;
@@ -975,6 +1028,19 @@ app.post("/api/tournaments/:id/couples", auth, async (req, res) => {
     res.json(await Tournament.findById(t._id).populate(T_POPULATE));
   } catch (err) {
     res.status(500).json({ msg: "Errore aggiunta coppia", error: err.message });
+  }
+});
+
+app.delete("/api/tournaments/:id/couples/:coupleId", auth, adminOnly, async (req, res) => {
+  try {
+    const t = await Tournament.findById(req.params.id);
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+
+    t.couples = t.couples.filter(c => c._id.toString() !== req.params.coupleId);
+    await t.save();
+    res.json(await Tournament.findById(t._id).populate(T_POPULATE));
+  } catch (err) {
+    res.status(500).json({ msg: "Errore rimozione coppia", error: err.message });
   }
 });
 
