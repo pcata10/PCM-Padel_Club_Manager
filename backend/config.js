@@ -1,6 +1,6 @@
 module.exports = {
-  clubName: process.env.CLUB_NAME || "IL TUO PADEL CLUB",
-  clubShortName: process.env.CLUB_SHORT_NAME || "",
+  clubName: process.env.CLUB_NAME || "Padel Admin Tornei",
+  clubShortName: process.env.CLUB_SHORT_NAME || "JPadel",
   clubEmail: process.env.CLUB_EMAIL || "",
   clubPhone: process.env.CLUB_PHONE || "",
   clubAddress: process.env.CLUB_ADDRESS || "",
@@ -16,7 +16,6 @@ module.exports = {
     { name: "Campo 1", type: "indoor", order: 1 },
     { name: "Campo 2", type: "indoor", order: 2 },
     { name: "Campo 3", type: "indoor", order: 3 },
-    { name: "Campo 4 Esterno", type: "outdoor", order: 4 },
-    { name: "Campo 5 Esterno", type: "outdoor", order: 5 },
+    { name: "Campo 4", type: "indoor", order: 4 },
   ],
 };

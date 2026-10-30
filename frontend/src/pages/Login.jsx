@@ -43,12 +43,15 @@ export default function Login() {
       );
       axios.defaults.headers.common["Authorization"] =
         `Bearer ${res.data.token}`;
-      const role = getRole();
-      navigate(role === "admin" ? "/admin" : "/dashboard");
+      navigate("/admin/tournaments");
     } catch (err) {
       setError(err.response?.data?.msg || "Errore login");
     }
     setLoading(false);
+  };
+
+  const fillAdmin = () => {
+    setForm({ email: "admin@padel.local", password: "admin123" });
   };
 
   return (
@@ -104,15 +107,22 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center mt-6 text-sm text-gray-600">
-          Non hai account?{" "}
-          <Link
-            to="/register"
-            className="font-semibold text-emerald-600 hover:text-emerald-700"
+        {/* Demo / Local Admin Quick Access */}
+        <div className="mt-6 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+          <p className="text-xs text-slate-500 mb-1">
+            Accesso Locale (Pen drive / Offline):
+          </p>
+          <p className="text-xs font-mono text-slate-700 mb-2">
+            admin@padel.local / admin123
+          </p>
+          <button
+            type="button"
+            onClick={fillAdmin}
+            className="text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1 rounded-lg transition-all"
           >
-            Registrati
-          </Link>
-        </p>
+            ⚡ Compila credenziali admin
+          </button>
+        </div>
 
         <SponsorFooter />
       </div>

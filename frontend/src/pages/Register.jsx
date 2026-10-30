@@ -1,3 +1,8 @@
+// ════════════════════════════════════════════════════════════════
+// BOOKING EDITION — This page is NOT used in Tournament Mode.
+// It is kept for reference and can be re-enabled by adding its
+// Route back to main.jsx and restoring the MongoDB backend.
+// ════════════════════════════════════════════════════════════════
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";

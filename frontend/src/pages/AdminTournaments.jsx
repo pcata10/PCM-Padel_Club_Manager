@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import html2canvas from "html2canvas";
 import NavBar from "../components/NavBar";
 import SponsorFooter from "../components/SponsorFooter";
 
@@ -51,6 +52,7 @@ const EMPTY_FORM = {
   courts: [],
   level: "intermedio",
   status: "open",
+  format: "gironi",
 };
 const EMPTY_NEW_PLAYER = {
   name: "",
@@ -120,11 +122,10 @@ function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
   return (
     <div className="flex flex-col gap-3 min-w-[180px]">
       <div
-        className={`text-center text-xs font-bold py-1.5 rounded-xl text-white ${
-          phase === "gold"
-            ? "bg-gradient-to-r from-amber-500 to-yellow-500"
-            : "bg-gradient-to-r from-slate-400 to-gray-500"
-        }`}
+        className={`text-center text-xs font-bold py-1.5 rounded-xl text-white ${phase === "gold"
+          ? "bg-gradient-to-r from-amber-500 to-yellow-500"
+          : "bg-gradient-to-r from-slate-400 to-gray-500"
+          }`}
       >
         {ROUND_LABEL[round] || round}
       </div>
@@ -150,12 +151,11 @@ function BracketColumn({ round, matches, couples, phase, onMatchClick }) {
                 key={i}
                 className={`px-3 py-2 text-xs font-bold flex items-center justify-between
                   ${i === 0 ? "border-b border-gray-100" : ""}
-                  ${
-                    m.winner?.toString() === c?._id?.toString()
-                      ? "bg-green-50 text-green-700"
-                      : m.winner
-                        ? "bg-gray-50 text-gray-400"
-                        : "bg-white text-slate-700"
+                  ${m.winner?.toString() === c?._id?.toString()
+                    ? "bg-green-50 text-green-700"
+                    : m.winner
+                      ? "bg-gray-50 text-gray-400"
+                      : "bg-white text-slate-700"
                   }
                 `}
               >
@@ -227,6 +227,133 @@ function BracketSection({ phase, matches, couples, onMatchClick }) {
   );
 }
 
+// ── KnockoutBracketView (Eliminazione Diretta) ────────────────────
+function KnockoutBracketView({ rounds, couples, onMatchClick }) {
+  if (!rounds || !rounds.length) return null;
+
+  const resolveCouple = (cRef) => {
+    if (!cRef) return null;
+    if (typeof cRef === "object" && cRef._id) return cRef;
+    return couples.find((c) => c._id?.toString() === cRef.toString()) || null;
+  };
+
+  return (
+    <div className="overflow-x-auto pb-4">
+      <div className="flex gap-6 min-w-max items-start py-3 px-1">
+        {rounds.map((round, rIdx) => (
+          <div key={round.name || rIdx} className="w-64 flex flex-col gap-3">
+            {/* Round Title Header */}
+            <div className="bg-gradient-to-r from-slate-900 to-black text-yellow-400 font-black text-xs px-4 py-2.5 rounded-2xl text-center shadow-md flex items-center justify-between border border-neutral-800">
+              <span>{round.name}</span>
+              <span className="text-[10px] bg-neutral-800 text-yellow-300 font-bold px-2 py-0.5 rounded-full">
+                {round.matches.length} {round.matches.length === 1 ? "match" : "match"}
+              </span>
+            </div>
+
+            {/* Matches in Round */}
+            <div className="flex flex-col gap-3 flex-1 justify-around">
+              {round.matches.map((m, mIdx) => {
+                const c1 = resolveCouple(m.couple1);
+                const c2 = resolveCouple(m.couple2);
+                const winnerId =
+                  typeof m.winner === "object" ? m.winner?._id : m.winner;
+                const isFinished = !!winnerId;
+                const isPlayable = !!c1 && !!c2;
+
+                return (
+                  <div
+                    key={m._id || mIdx}
+                    onClick={() => isPlayable && onMatchClick(m, c1, c2)}
+                    className={`rounded-2xl border-2 transition-all overflow-hidden select-none shadow-sm ${isPlayable
+                        ? "cursor-pointer hover:shadow-lg hover:border-yellow-400"
+                        : "opacity-60 cursor-not-allowed"
+                      } ${isFinished
+                        ? "border-emerald-300 bg-white"
+                        : "border-slate-200 bg-white"
+                      }`}
+                  >
+                    {/* Top subheader */}
+                    <div className="bg-slate-50 border-b border-slate-100 px-3 py-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>Match #{mIdx + 1}</span>
+                      {m.score ? (
+                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-extrabold text-[10px]">
+                          {m.score}
+                        </span>
+                      ) : isPlayable ? (
+                        <span className="text-teal-600 font-semibold hover:underline">
+                          Risultato ✏️
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">In attesa</span>
+                      )}
+                    </div>
+
+                    {/* Team 1 */}
+                    <div
+                      className={`px-3 py-2 text-xs font-bold flex items-center justify-between border-b border-slate-100 ${winnerId &&
+                          (winnerId === c1?._id ||
+                            winnerId?.toString() === c1?._id?.toString())
+                          ? "bg-emerald-50 text-emerald-800"
+                          : winnerId
+                            ? "bg-slate-50 text-slate-400"
+                            : "bg-white text-slate-700"
+                        }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {c1?.seeded && (
+                          <span className="text-amber-500 text-[10px]">⭐</span>
+                        )}
+                        <span className="truncate">
+                          {c1 ? coupleShortName(c1) : "(In attesa)"}
+                        </span>
+                      </div>
+                      {winnerId &&
+                        (winnerId === c1?._id ||
+                          winnerId?.toString() === c1?._id?.toString()) && (
+                          <span className="text-emerald-600 font-extrabold text-xs ml-1">
+                            ✓
+                          </span>
+                        )}
+                    </div>
+
+                    {/* Team 2 */}
+                    <div
+                      className={`px-3 py-2 text-xs font-bold flex items-center justify-between ${winnerId &&
+                          (winnerId === c2?._id ||
+                            winnerId?.toString() === c2?._id?.toString())
+                          ? "bg-emerald-50 text-emerald-800"
+                          : winnerId
+                            ? "bg-slate-50 text-slate-400"
+                            : "bg-white text-slate-700"
+                        }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {c2?.seeded && (
+                          <span className="text-amber-500 text-[10px]">⭐</span>
+                        )}
+                        <span className="truncate">
+                          {c2 ? coupleShortName(c2) : "(In attesa)"}
+                        </span>
+                      </div>
+                      {winnerId &&
+                        (winnerId === c2?._id ||
+                          winnerId?.toString() === c2?._id?.toString()) && (
+                          <span className="text-emerald-600 font-extrabold text-xs ml-1">
+                            ✓
+                          </span>
+                        )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
@@ -251,18 +378,21 @@ export default function AdminTournaments() {
 
   // modal coppia
   const [coupleModal, setCoupleModal] = useState(null);
+  const [coupleTab, setCoupleTab] = useState("direct"); // "direct" | "batch"
   const [coupleForm, setCoupleForm] = useState({
-    player1Id: "",
-    player2Id: "",
+    player1: "",
+    player2: "",
     name: "",
   });
+  const [batchCouplesText, setBatchCouplesText] = useState("");
 
   // modal risultato
   const [scoreModal, setScoreModal] = useState(null);
   const [scoreForm, setScoreForm] = useState({ score: "", winner: "" });
 
   const [drawLoading, setDrawLoading] = useState(false);
-  
+  const [exportingImage, setExportingImage] = useState(false);
+
   // modal conferma azioni
   const [confirmAction, setConfirmAction] = useState(null); // { title, sub, onConfirm, btnText, color }
 
@@ -329,6 +459,7 @@ export default function AdminTournaments() {
       endTime: t.endTime || "18:00",
       level: t.level,
       status: t.status,
+      format: t.format || "gironi",
       courts: t.courts?.map((c) => c._id || c) || [],
     });
     setEditingId(t._id);
@@ -382,17 +513,42 @@ export default function AdminTournaments() {
 
   // ── Coppie ────────────────────────────────────────────────────
   const addCouple = async (tid) => {
-    if (!coupleForm.player1Id || !coupleForm.player2Id)
-      return alert("Seleziona entrambi i giocatori");
-    if (coupleForm.player1Id === coupleForm.player2Id)
-      return alert("I giocatori devono essere diversi");
+    if (!coupleForm.player1?.trim() || !coupleForm.player2?.trim())
+      return alert("Inserisci i nomi di entrambi i giocatori");
+    if (
+      coupleForm.player1.trim().toLowerCase() ===
+      coupleForm.player2.trim().toLowerCase()
+    )
+      return alert("I due giocatori devono avere nomi diversi");
     try {
-      await api.post(`/api/tournaments/${tid}/couples`, coupleForm);
+      await api.post(`/api/tournaments/${tid}/couples`, {
+        player1Name: coupleForm.player1.trim(),
+        player2Name: coupleForm.player2.trim(),
+        name: coupleForm.name?.trim() || undefined,
+      });
       await refreshT(tid);
+      await fetchAll();
       setCoupleModal(null);
-      setCoupleForm({ player1Id: "", player2Id: "", name: "" });
+      setCoupleForm({ player1: "", player2: "", name: "" });
     } catch (err) {
       alert(err.response?.data?.msg || "Errore aggiunta coppia");
+    }
+  };
+
+  const addBatchCouples = async (tid) => {
+    if (!batchCouplesText.trim())
+      return alert("Incolla o inserisci almeno una coppia");
+    try {
+      const res = await api.post(`/api/tournaments/${tid}/couples/batch`, {
+        text: batchCouplesText,
+      });
+      await refreshT(tid);
+      await fetchAll();
+      alert(`✅ Aggiunte con successo ${res.data.addedCount} coppie!`);
+      setCoupleModal(null);
+      setBatchCouplesText("");
+    } catch (err) {
+      alert(err.response?.data?.msg || "Errore aggiunta batch");
     }
   };
 
@@ -418,13 +574,19 @@ export default function AdminTournaments() {
   };
 
   // ── Tabellone ─────────────────────────────────────────────────
-  const generateDraw = async (tid) => {
+  const generateDraw = async (tid, chosenFormat) => {
     const t = tournaments.find((x) => x._id === tid);
-    if ((t?.couples?.length || 0) < 3) return alert("Servono almeno 3 coppie");
+    const format = chosenFormat || t?.format || "gironi";
+    const minCouples = format === "knockout" ? 2 : 3;
+    if ((t?.couples?.length || 0) < minCouples)
+      return alert(
+        `Servono almeno ${minCouples} coppie per ${format === "knockout" ? "l'eliminazione diretta" : "i gironi"
+        } (${t?.couples?.length || 0} attualmente iscritte)`
+      );
 
     setDrawLoading(true);
     try {
-      await api.post(`/api/tournaments/${tid}/draw`);
+      await api.post(`/api/tournaments/${tid}/draw`, { format });
       await fetchAll();
       await refreshT(tid);
       setConfirmAction(null);
@@ -432,6 +594,36 @@ export default function AdminTournaments() {
       alert(err.response?.data?.msg || "Errore generazione tabellone");
     } finally {
       setDrawLoading(false);
+    }
+  };
+
+  const exportDrawAsImage = async (format = "png") => {
+    const el = document.getElementById("tournament-draw-capture");
+    if (!el) return alert("Nessun tabellone trovato da esportare");
+    setExportingImage(true);
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      const safeName = (selectedT?.name || "tabellone").replace(
+        /[^a-zA-Z0-9_-]/g,
+        "_"
+      );
+      link.download = `${safeName}_tabellone.${format}`;
+      link.href = canvas.toDataURL(
+        format === "jpeg" ? "image/jpeg" : "image/png",
+        0.95
+      );
+      link.click();
+    } catch (err) {
+      console.error("Export image error:", err);
+      alert("Errore durante l'esportazione dell'immagine");
+    } finally {
+      setExportingImage(false);
     }
   };
 
@@ -468,26 +660,49 @@ export default function AdminTournaments() {
   const playerDisplayName = (p) =>
     [p.name, p.surname].filter(Boolean).join(" ");
 
-  const groupRanking = (t, groupNum) => {
-    const group = t.groups?.find((g) => g.number === groupNum);
+  const groupRanking = (t, groupIdentifier) => {
+    const group = t.groups?.find(
+      (g) =>
+        g.number === groupIdentifier ||
+        g.name === groupIdentifier ||
+        g._id === groupIdentifier
+    );
     if (!group) return [];
     const stats = {};
-    group.couples.forEach((id) => {
-      stats[id?.toString()] = {
-        id: id?.toString(),
-        wins: 0,
-        losses: 0,
-        played: 0,
-      };
+    (group.couples || []).forEach((cItem) => {
+      const id =
+        typeof cItem === "object"
+          ? cItem._id?.toString()
+          : cItem?.toString();
+      if (!id) return;
+      stats[id] = { id, wins: 0, losses: 0, played: 0 };
     });
-    t.matches
-      .filter((m) => m.phase === "group" && m.group === groupNum && m.winner)
+
+    const allGroupMatches = [
+      ...(group.matches || []),
+      ...(t.matches || []).filter(
+        (m) =>
+          m.phase === "group" &&
+          (m.group === groupIdentifier || m.group === group.number)
+      ),
+    ];
+
+    allGroupMatches
+      .filter((m) => m.winner)
       .forEach((m) => {
-        const w = m.winner?.toString();
-        const l =
-          m.couple1?.toString() === w
-            ? m.couple2?.toString()
+        const w =
+          typeof m.winner === "object"
+            ? m.winner._id?.toString()
+            : m.winner?.toString();
+        const c1 =
+          typeof m.couple1 === "object"
+            ? m.couple1._id?.toString()
             : m.couple1?.toString();
+        const c2 =
+          typeof m.couple2 === "object"
+            ? m.couple2._id?.toString()
+            : m.couple2?.toString();
+        const l = c1 === w ? c2 : c1;
         if (stats[w]) {
           stats[w].wins++;
           stats[w].played++;
@@ -497,11 +712,12 @@ export default function AdminTournaments() {
           stats[l].played++;
         }
       });
+
     return Object.values(stats)
       .sort((a, b) => b.wins - a.wins || a.losses - b.losses)
       .map((s) => ({
         ...s,
-        couple: t.couples.find((c) => c._id?.toString() === s.id),
+        couple: t.couples?.find((c) => c._id?.toString() === s.id),
       }));
   };
 
@@ -549,7 +765,7 @@ export default function AdminTournaments() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="es. Torneo Puglia Serie C"
+                  placeholder="es. Torneo Intermedio"
                   className="w-full p-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-emerald-300 text-sm"
                 />
               </div>
@@ -602,6 +818,24 @@ export default function AdminTournaments() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">
+                  ⚔️ Formato Torneo
+                </label>
+                <select
+                  value={form.format || "gironi"}
+                  onChange={(e) =>
+                    setForm({ ...form, format: e.target.value })
+                  }
+                  className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm font-semibold text-slate-800"
+                >
+                  <option value="gironi">🏆 Torneo a Gironi (All'italiana)</option>
+                  <option value="knockout">
+                    ⚡ Eliminazione Diretta (Tabellone KO)
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
                   🎯 Livello
                 </label>
                 <select
@@ -648,11 +882,10 @@ export default function AdminTournaments() {
                               : [...f.courts, court._id],
                           }))
                         }
-                        className={`px-4 py-2 rounded-2xl text-sm font-semibold border-2 transition-all ${
-                          sel
-                            ? "bg-slate-700 text-white border-slate-800"
-                            : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
-                        }`}
+                        className={`px-4 py-2 rounded-2xl text-sm font-semibold border-2 transition-all ${sel
+                          ? "bg-slate-700 text-white border-slate-800"
+                          : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                          }`}
                       >
                         {sel ? "✓ " : ""}
                         {court.name}
@@ -699,9 +932,8 @@ export default function AdminTournaments() {
               return (
                 <div
                   key={t._id}
-                  className={`bg-white/95 rounded-3xl shadow-lg overflow-hidden transition-all ${
-                    isOpen ? "ring-2 ring-emerald-400" : ""
-                  }`}
+                  className={`bg-white/95 rounded-3xl shadow-lg overflow-hidden transition-all ${isOpen ? "ring-2 ring-emerald-400" : ""
+                    }`}
                 >
                   {/* ── Card header ── */}
                   <div
@@ -716,6 +948,17 @@ export default function AdminTournaments() {
                         <span className="text-lg font-bold text-slate-800">
                           {t.name}
                         </span>
+                        <Badge
+                          className={
+                            t.format === "knockout"
+                              ? "bg-purple-100 text-purple-700 font-bold"
+                              : "bg-amber-100 text-amber-700 font-bold"
+                          }
+                        >
+                          {t.format === "knockout"
+                            ? "⚡ Eliminazione Diretta"
+                            : "🏆 Gironi"}
+                        </Badge>
                         <Badge
                           className={
                             LEVEL_CFG[t.level]?.badge ||
@@ -761,21 +1004,21 @@ export default function AdminTournaments() {
                         )}
                         {t.matches?.filter((m) => m.phase === "group").length >
                           0 && (
-                          <Badge className="bg-amber-100 text-amber-700">
-                            🎾{" "}
-                            {
-                              t.matches.filter(
-                                (m) => m.phase === "group" && m.winner,
-                              ).length
-                            }
-                            /
-                            {
-                              t.matches.filter((m) => m.phase === "group")
-                                .length
-                            }{" "}
-                            match gironi
-                          </Badge>
-                        )}
+                            <Badge className="bg-amber-100 text-amber-700">
+                              🎾{" "}
+                              {
+                                t.matches.filter(
+                                  (m) => m.phase === "group" && m.winner,
+                                ).length
+                              }
+                              /
+                              {
+                                t.matches.filter((m) => m.phase === "group")
+                                  .length
+                              }{" "}
+                              match gironi
+                            </Badge>
+                          )}
                       </div>
                     </div>
                     <div
@@ -817,11 +1060,10 @@ export default function AdminTournaments() {
                           <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 py-3 text-sm font-bold transition-all ${
-                              activeTab === tab.id
-                                ? "border-b-2 border-emerald-500 text-emerald-700 bg-white"
-                                : "text-gray-400 hover:text-gray-600"
-                            }`}
+                            className={`flex-1 py-3 text-sm font-bold transition-all ${activeTab === tab.id
+                              ? "border-b-2 border-emerald-500 text-emerald-700 bg-white"
+                              : "text-gray-400 hover:text-gray-600"
+                              }`}
                           >
                             {tab.label}
                           </button>
@@ -842,15 +1084,17 @@ export default function AdminTournaments() {
                               <button
                                 onClick={() => {
                                   setCoupleModal(t._id);
+                                  setCoupleTab("direct");
                                   setCoupleForm({
-                                    player1Id: "",
-                                    player2Id: "",
+                                    player1: "",
+                                    player2: "",
                                     name: "",
                                   });
+                                  setBatchCouplesText("");
                                 }}
-                                className="text-sm bg-teal-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-teal-600 transition-all"
+                                className="text-sm bg-teal-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-teal-600 transition-all flex items-center gap-1.5 shadow-sm"
                               >
-                                + Aggiungi coppia
+                                <span>➕</span> Aggiungi coppia
                               </button>
                             </div>
 
@@ -883,11 +1127,10 @@ export default function AdminTournaments() {
                                 {t.couples.map((c) => (
                                   <div
                                     key={c._id}
-                                    className={`flex items-center justify-between rounded-2xl px-4 py-3 border transition-all ${
-                                      c.seeded
-                                        ? "bg-amber-50 border-amber-200"
-                                        : "bg-teal-50 border-teal-100"
-                                    }`}
+                                    className={`flex items-center justify-between rounded-2xl px-4 py-3 border transition-all ${c.seeded
+                                      ? "bg-amber-50 border-amber-200"
+                                      : "bg-teal-50 border-teal-100"
+                                      }`}
                                   >
                                     <div>
                                       <div className="flex items-center gap-1.5">
@@ -920,11 +1163,10 @@ export default function AdminTournaments() {
                                             ? "Rimuovi testa di serie"
                                             : "Segna come testa di serie"
                                         }
-                                        className={`text-xs px-2.5 py-1 rounded-xl font-semibold transition-all ${
-                                          c.seeded
-                                            ? "bg-amber-200 text-amber-800 hover:bg-amber-300"
-                                            : "bg-gray-100 text-gray-400 hover:bg-amber-100 hover:text-amber-600"
-                                        }`}
+                                        className={`text-xs px-2.5 py-1 rounded-xl font-semibold transition-all ${c.seeded
+                                          ? "bg-amber-200 text-amber-800 hover:bg-amber-300"
+                                          : "bg-gray-100 text-gray-400 hover:bg-amber-100 hover:text-amber-600"
+                                          }`}
                                       >
                                         ⭐
                                       </button>
@@ -1048,11 +1290,10 @@ export default function AdminTournaments() {
                                 disabled={
                                   drawLoading || (t.couples?.length || 0) < 3
                                 }
-                                className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all ${
-                                  (t.couples?.length || 0) < 3
-                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                    : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
-                                }`}
+                                className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all ${(t.couples?.length || 0) < 3
+                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
+                                  }`}
                               >
                                 {drawLoading
                                   ? "⏳ Generando..."
@@ -1142,13 +1383,12 @@ export default function AdminTournaments() {
                                   </div>
 
                                   <div
-                                    className={`grid gap-4 ${
-                                      t.groups.length <= 2
-                                        ? "grid-cols-1 md:grid-cols-2"
-                                        : t.groups.length === 3
-                                          ? "grid-cols-1 md:grid-cols-3"
-                                          : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-                                    }`}
+                                    className={`grid gap-4 ${t.groups.length <= 2
+                                      ? "grid-cols-1 md:grid-cols-2"
+                                      : t.groups.length === 3
+                                        ? "grid-cols-1 md:grid-cols-3"
+                                        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+                                      }`}
                                   >
                                     {t.groups.map((group) => {
                                       const ranking = groupRanking(
@@ -1188,13 +1428,12 @@ export default function AdminTournaments() {
                                               >
                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                   <span
-                                                    className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
-                                                      idx === 0
-                                                        ? "bg-amber-400 text-white"
-                                                        : idx === 1
-                                                          ? "bg-slate-300 text-slate-700"
-                                                          : "bg-gray-100 text-gray-400"
-                                                    }`}
+                                                    className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${idx === 0
+                                                      ? "bg-amber-400 text-white"
+                                                      : idx === 1
+                                                        ? "bg-slate-300 text-slate-700"
+                                                        : "bg-gray-100 text-gray-400"
+                                                      }`}
                                                   >
                                                     {idx + 1}
                                                   </span>
@@ -1217,11 +1456,10 @@ export default function AdminTournaments() {
                                                     {s.losses}S
                                                   </span>
                                                   <span
-                                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                                      idx < 2
-                                                        ? "bg-amber-100 text-amber-700"
-                                                        : "bg-gray-100 text-gray-400"
-                                                    }`}
+                                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${idx < 2
+                                                      ? "bg-amber-100 text-amber-700"
+                                                      : "bg-gray-100 text-gray-400"
+                                                      }`}
                                                   >
                                                     {idx < 2
                                                       ? "Gold"
@@ -1262,38 +1500,34 @@ export default function AdminTournaments() {
                                                         "",
                                                     });
                                                   }}
-                                                  className={`flex items-center justify-between rounded-xl px-2.5 py-2 text-xs cursor-pointer transition-all ${
-                                                    m.winner
-                                                      ? "bg-green-50 border border-green-100 hover:bg-green-100"
-                                                      : "bg-gray-50 border border-gray-100 hover:bg-blue-50 hover:border-blue-200"
-                                                  }`}
+                                                  className={`flex items-center justify-between rounded-xl px-2.5 py-2 text-xs cursor-pointer transition-all ${m.winner
+                                                    ? "bg-green-50 border border-green-100 hover:bg-green-100"
+                                                    : "bg-gray-50 border border-gray-100 hover:bg-blue-50 hover:border-blue-200"
+                                                    }`}
                                                 >
                                                   <span
-                                                    className={`font-bold truncate max-w-[60px] ${
-                                                      m.winner?.toString() ===
+                                                    className={`font-bold truncate max-w-[60px] ${m.winner?.toString() ===
                                                       c1?._id?.toString()
-                                                        ? "text-green-700"
-                                                        : "text-gray-600"
-                                                    }`}
+                                                      ? "text-green-700"
+                                                      : "text-gray-600"
+                                                      }`}
                                                   >
                                                     {coupleShortName(c1)}
                                                   </span>
                                                   <span
-                                                    className={`mx-1 px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
-                                                      m.score
-                                                        ? "bg-yellow-100 text-yellow-700"
-                                                        : "bg-gray-100 text-gray-400"
-                                                    }`}
+                                                    className={`mx-1 px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${m.score
+                                                      ? "bg-yellow-100 text-yellow-700"
+                                                      : "bg-gray-100 text-gray-400"
+                                                      }`}
                                                   >
                                                     {m.score || "vs"}
                                                   </span>
                                                   <span
-                                                    className={`font-bold truncate max-w-[60px] text-right ${
-                                                      m.winner?.toString() ===
+                                                    className={`font-bold truncate max-w-[60px] text-right ${m.winner?.toString() ===
                                                       c2?._id?.toString()
-                                                        ? "text-green-700"
-                                                        : "text-gray-600"
-                                                    }`}
+                                                      ? "text-green-700"
+                                                      : "text-gray-600"
+                                                      }`}
                                                   >
                                                     {coupleShortName(c2)}
                                                   </span>
@@ -1387,21 +1621,19 @@ export default function AdminTournaments() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setPlayerTab("search")}
-                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-                    playerTab === "search"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${playerTab === "search"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   🔍 Giocatori esistenti
                 </button>
                 <button
                   onClick={() => setPlayerTab("new")}
-                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-                    playerTab === "new"
-                      ? "bg-emerald-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${playerTab === "new"
+                    ? "bg-emerald-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   ➕ Nuovo giocatore
                 </button>
@@ -1461,11 +1693,10 @@ export default function AdminTournaments() {
                               onClick={() =>
                                 addRegisteredPlayer(playerModal, p._id)
                               }
-                              className={`text-xs px-3 py-1.5 rounded-xl font-semibold transition-all ml-3 shrink-0 ${
-                                alreadyIn
-                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                  : "bg-blue-500 text-white hover:bg-blue-600"
-                              }`}
+                              className={`text-xs px-3 py-1.5 rounded-xl font-semibold transition-all ml-3 shrink-0 ${alreadyIn
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "bg-blue-500 text-white hover:bg-blue-600"
+                                }`}
                             >
                               {alreadyIn ? "✓ Iscritto" : "+ Iscrivi"}
                             </button>
@@ -1606,100 +1837,188 @@ export default function AdminTournaments() {
       )}
 
       {/* ══════════════════════════════════════════════════════════
-          MODAL: AGGIUNGI COPPIA
+          MODAL: AGGIUNGI COPPIA (Semplificato & Rapido)
       ══════════════════════════════════════════════════════════ */}
       {coupleModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-800">
-                🤝 Nuova Coppia
-              </h3>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  🤝 Aggiungi Coppia
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Scrivi direttamente i nomi: i giocatori vengono creati automaticamente!
+                </p>
+              </div>
               <button
                 onClick={() => setCoupleModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none p-1 rounded-lg"
               >
                 ✕
               </button>
             </div>
-            <div className="bg-teal-50 border border-teal-200 rounded-2xl px-4 py-2.5 text-sm text-teal-700">
-              ℹ️ I giocatori selezionati vengono automaticamente aggiunti alla
-              lista giocatori
+
+            {/* Schede: Singola Rapida vs Incolla Multiplo */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setCoupleTab("direct")}
+                className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${coupleTab === "direct"
+                  ? "bg-white text-teal-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                ⚡ Inserimento Diretto
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoupleTab("batch")}
+                className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${coupleTab === "batch"
+                  ? "bg-white text-teal-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                📋 Incolla Lista (Multiplo)
+              </button>
             </div>
 
-            {["player1Id", "player2Id"].map((field, i) => (
-              <div key={field}>
-                <label className="block text-sm font-bold text-gray-700 mb-1">
-                  Giocatore {i + 1}
-                </label>
-                <select
-                  value={coupleForm[field]}
-                  onChange={(e) =>
-                    setCoupleForm({ ...coupleForm, [field]: e.target.value })
-                  }
-                  className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-teal-300"
+            {/* Datalist per autocompletamento rapido */}
+            <datalist id="all-players-datalist">
+              {allPlayers.map((p) => (
+                <option
+                  key={p._id}
+                  value={playerDisplayName(p)}
                 >
-                  <option value="">— Seleziona —</option>
-                  {allPlayers
-                    .filter((p) =>
-                      field === "player2Id"
-                        ? p._id !== coupleForm.player1Id
-                        : true,
-                    )
-                    .map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {playerDisplayName(p)} ({p.level})
-                      </option>
-                    ))}
-                </select>
-              </div>
-            ))}
+                  {p.level ? `Livello: ${p.level}` : ""}
+                </option>
+              ))}
+            </datalist>
 
-            {coupleForm.player1Id && coupleForm.player2Id && (
-              <div className="bg-slate-50 rounded-2xl px-4 py-2.5 text-sm text-slate-600 text-center font-medium">
-                🤝{" "}
-                {playerDisplayName(
-                  allPlayers.find((p) => p._id === coupleForm.player1Id) || {},
-                )}
-                {" / "}
-                {playerDisplayName(
-                  allPlayers.find((p) => p._id === coupleForm.player2Id) || {},
-                )}
+            {coupleTab === "direct" ? (
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Giocatore 1 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    list="all-players-datalist"
+                    value={coupleForm.player1}
+                    onChange={(e) =>
+                      setCoupleForm({ ...coupleForm, player1: e.target.value })
+                    }
+                    placeholder="Es. Mario Rossi (scrivi o seleziona)"
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Giocatore 2 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    list="all-players-datalist"
+                    value={coupleForm.player2}
+                    onChange={(e) =>
+                      setCoupleForm({ ...coupleForm, player2: e.target.value })
+                    }
+                    placeholder="Es. Luca Bianchi (scrivi o seleziona)"
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Nome Coppia{" "}
+                    <span className="font-normal text-gray-400 lowercase">
+                      (opzionale, auto-generato)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={coupleForm.name}
+                    onChange={(e) =>
+                      setCoupleForm({ ...coupleForm, name: e.target.value })
+                    }
+                    placeholder={
+                      coupleForm.player1 && coupleForm.player2
+                        ? `${coupleForm.player1} / ${coupleForm.player2}`
+                        : "Es. I Campioni"
+                    }
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-xs text-emerald-800 flex items-center gap-2">
+                  <span>✨</span>
+                  <span>
+                    Non serve creare i giocatori prima: se non sono registrati, il sistema li crea automaticamente!
+                  </span>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCoupleModal(null)}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all text-sm"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addCouple(coupleModal)}
+                    className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-teal-100 transition-all text-sm flex items-center justify-center gap-1.5"
+                  >
+                    ➕ Aggiungi Coppia
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Incolla o scrivi una coppia per riga:
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={batchCouplesText}
+                    onChange={(e) => setBatchCouplesText(e.target.value)}
+                    placeholder={`Mario Rossi - Luca Bianchi\nAndrea Neri / Paolo Verdi\nGiovanni Gialli - Fabio Viola\nRoberto Bruno, Stefano Rosa`}
+                    className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm font-mono focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all leading-relaxed"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Puoi separare i due giocatori con <code className="bg-gray-100 px-1 rounded">-</code>, <code className="bg-gray-100 px-1 rounded">/</code>, oppure <code className="bg-gray-100 px-1 rounded">,</code>.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-xs text-blue-800 flex items-center gap-2">
+                  <span>⚡</span>
+                  <span>
+                    Ideale per incollare la lista da WhatsApp, Excel o Note in un solo istante!
+                  </span>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCoupleModal(null)}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all text-sm"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addBatchCouples(coupleModal)}
+                    className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-teal-100 transition-all text-sm flex items-center justify-center gap-1.5"
+                  >
+                    ⚡ Aggiungi Tutte le Coppie
+                  </button>
+                </div>
               </div>
             )}
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">
-                Nome coppia{" "}
-                <span className="font-normal text-gray-400">
-                  (auto se vuoto)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={coupleForm.name}
-                onChange={(e) =>
-                  setCoupleForm({ ...coupleForm, name: e.target.value })
-                }
-                placeholder="es. Rossi / Verdi"
-                className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-teal-300"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setCoupleModal(null)}
-                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => addCouple(coupleModal)}
-                className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-2xl font-bold hover:from-teal-600 hover:to-emerald-700"
-              >
-                🤝 Aggiungi coppia
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -1773,11 +2092,10 @@ export default function AdminTournaments() {
                     onClick={() =>
                       setScoreForm({ ...scoreForm, winner: c?._id?.toString() })
                     }
-                    className={`py-3 px-3 rounded-2xl text-sm font-bold transition-all text-center ${
-                      scoreForm.winner === c?._id?.toString()
-                        ? "bg-green-500 text-white shadow-md scale-[1.02]"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`py-3 px-3 rounded-2xl text-sm font-bold transition-all text-center ${scoreForm.winner === c?._id?.toString()
+                      ? "bg-green-500 text-white shadow-md scale-[1.02]"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     {c?.seeded ? "⭐ " : ""}
                     {coupleShortName(c)}
