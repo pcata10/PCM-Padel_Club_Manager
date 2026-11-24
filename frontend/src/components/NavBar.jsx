@@ -23,12 +23,17 @@ export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const config = useConfig();
 
-  // Modal cambio password
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState("");
+  // Modal impostazioni club & password
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [form, setForm] = useState({
+    clubName: "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -36,46 +41,75 @@ export default function NavBar() {
     navigate("/login");
   };
 
-  const handlePasswordChange = async (e) => {
+  const handleOpenSettings = () => {
+    setError("");
+    setSuccess("");
+    setForm({
+      clubName: config.clubName || "",
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setShowSettingsModal(true);
+  };
+
+  const handleSaveSettings = async (e) => {
     e.preventDefault();
-    setPwError("");
-    setPwSuccess("");
+    setError("");
+    setSuccess("");
 
-    if (!pwForm.newPassword || pwForm.newPassword.length < 6) {
-      return setPwError("La nuova password deve contenere almeno 6 caratteri");
+    const hasNewPassword = Boolean(form.newPassword && form.newPassword.trim());
+    const hasClubNameChange = Boolean(
+      form.clubName && form.clubName.trim() && form.clubName.trim() !== config.clubName
+    );
+
+    if (hasNewPassword) {
+      if (form.newPassword.trim().length < 6) {
+        return setError("La nuova password deve contenere almeno 6 caratteri");
+      }
+      if (form.newPassword.trim() === "admin123") {
+        return setError("Scegli una password differente da quella di default (admin123)");
+      }
+      if (form.newPassword !== form.confirmPassword) {
+        return setError("Le due password non coincidono");
+      }
     }
 
-    if (pwForm.newPassword === "admin123") {
-      return setPwError("Scegli una password differente da quella di default (admin123)");
+    if (!hasNewPassword && !hasClubNameChange) {
+      return setError("Nessuna modifica rilevata");
     }
 
-    if (pwForm.newPassword !== pwForm.confirmPassword) {
-      return setPwError("Le due password non coincidono");
-    }
-
-    setPwLoading(true);
+    setLoading(true);
     try {
-      await axios.post(
-        `${API}/api/change-password`,
-        {
-          currentPassword: pwForm.currentPassword,
-          newPassword: pwForm.newPassword,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      if (hasNewPassword) {
+        await axios.post(
+          `${API}/api/change-password`,
+          {
+            currentPassword: form.currentPassword,
+            newPassword: form.newPassword.trim(),
+            clubName: form.clubName ? form.clubName.trim() : undefined,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else if (hasClubNameChange) {
+        await axios.put(
+          `${API}/api/admin/club-name`,
+          { clubName: form.clubName.trim() },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
 
-      setPwSuccess("✅ Password modificata con successo!");
+      setSuccess("✅ Impostazioni salvate con successo!");
       setTimeout(() => {
-        setShowPasswordModal(false);
-        setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-        setPwSuccess("");
-      }, 1500);
+        window.location.reload();
+      }, 1000);
     } catch (err) {
-      setPwError(err.response?.data?.msg || "Errore durante il cambio password");
-    } finally {
-      setPwLoading(false);
+      setError(err.response?.data?.msg || "Errore durante il salvataggio");
+      setLoading(false);
     }
   };
+
+  const displayClubName = config.clubName && config.clubName !== "Gestione Tornei" ? config.clubName : "";
 
   return (
     <>
@@ -105,22 +139,17 @@ export default function NavBar() {
                   to="/admin/tournaments"
                   className="px-5 py-2 bg-blue-600 text-white font-extrabold rounded-xl shadow-md hover:bg-blue-500 hover:shadow-blue-500/25 hover:-translate-y-0.5 transition-all flex items-center gap-1.5"
                 >
-                  🏆 Gestione Tornei
+                  🏆 Gestione Tornei{displayClubName ? ` • ${displayClubName}` : ""}
                 </Link>
               )}
               {token ? (
                 <>
                   <button
-                    onClick={() => {
-                      setPwError("");
-                      setPwSuccess("");
-                      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-                      setShowPasswordModal(true);
-                    }}
-                    title="Modifica la password del tuo account"
+                    onClick={handleOpenSettings}
+                    title="Impostazioni Circolo e Password"
                     className="px-3.5 py-2 bg-slate-800 border border-slate-700 text-slate-300 font-bold rounded-xl shadow-sm hover:bg-slate-700 hover:text-white transition-all flex items-center gap-1.5 text-xs"
                   >
-                    🔑 Password
+                    ⚙️ Impostazioni
                   </button>
                   <button
                     onClick={logout}
@@ -172,7 +201,7 @@ export default function NavBar() {
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 bg-blue-600 text-white font-extrabold rounded-2xl w-full hover:bg-blue-500 transition-all"
                 >
-                  🏆 Gestione Tornei
+                  🏆 Gestione Tornei{displayClubName ? ` • ${displayClubName}` : ""}
                 </Link>
               )}
               {token ? (
@@ -180,11 +209,11 @@ export default function NavBar() {
                   <button
                     onClick={() => {
                       setMenuOpen(false);
-                      setShowPasswordModal(true);
+                      handleOpenSettings();
                     }}
                     className="flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-700 text-slate-200 font-bold rounded-2xl w-full hover:bg-slate-700 transition-all"
                   >
-                    🔑 Cambia Password
+                    ⚙️ Impostazioni Club & Password
                   </button>
                   <button
                     onClick={logout}
@@ -207,90 +236,111 @@ export default function NavBar() {
         </div>
       </nav>
 
-      {/* ── MODAL CAMBIO PASSWORD ── */}
-      {showPasswordModal && (
+      {/* ── MODAL IMPOSTAZIONI CLUB & PASSWORD ── */}
+      {showSettingsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
               <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
-                <span>🔑</span> Cambia Password
+                <span>⚙️</span> Impostazioni Circolo & Password
               </h3>
               <button
-                onClick={() => setShowPasswordModal(false)}
+                onClick={() => setShowSettingsModal(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold text-lg p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handlePasswordChange} className="space-y-4">
+            <form onSubmit={handleSaveSettings} className="space-y-4">
+              {/* Nome Circolo */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Password Attuale
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Nome del Circolo / Club</span>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">.env</span>
                 </label>
                 <input
-                  type="password"
-                  value={pwForm.currentPassword}
-                  onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
-                  placeholder="Inserisci la password in uso"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
+                  type="text"
+                  value={form.clubName}
+                  onChange={(e) => setForm({ ...form, clubName: e.target.value })}
+                  placeholder="es. Padel Club Roma"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800 font-bold"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Nuova Password (min. 6 caratteri)
-                </label>
-                <input
-                  type="password"
-                  value={pwForm.newPassword}
-                  onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
-                  placeholder="Inserisci nuova password"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
-                  required
-                />
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                  Modifica Password (opzionale)
+                </span>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Password Attuale
+                    </label>
+                    <input
+                      type="password"
+                      value={form.currentPassword}
+                      onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
+                      placeholder="Necessaria per cambiare password"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Nuova Password
+                    </label>
+                    <input
+                      type="password"
+                      value={form.newPassword}
+                      onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+                      placeholder="Lascia vuoto per non cambiarla"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Conferma Nuova Password
+                    </label>
+                    <input
+                      type="password"
+                      value={form.confirmPassword}
+                      onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                      placeholder="Ripeti la nuova password"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Conferma Nuova Password
-                </label>
-                <input
-                  type="password"
-                  value={pwForm.confirmPassword}
-                  onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
-                  placeholder="Ripeti nuova password"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800"
-                  required
-                />
-              </div>
-
-              {pwError && (
+              {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold">
-                  ⚠️ {pwError}
+                  ⚠️ {error}
                 </div>
               )}
 
-              {pwSuccess && (
+              {success && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold">
-                  {pwSuccess}
+                  {success}
                 </div>
               )}
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPasswordModal(false)}
+                  onClick={() => setShowSettingsModal(false)}
                   className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-all"
                 >
                   Annulla
                 </button>
                 <button
                   type="submit"
-                  disabled={pwLoading}
+                  disabled={loading}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50"
                 >
-                  {pwLoading ? "Salvataggio..." : "Salva Nuova Password"}
+                  {loading ? "Salvataggio..." : "Salva Impostazioni"}
                 </button>
               </div>
             </form>

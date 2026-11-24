@@ -73,11 +73,11 @@ if not exist "frontend\dist\" (
 )
 
 echo.
-echo ✅ Tutto pronto! Apertura browser su http://localhost:4000
+echo ✅ Tutto pronto! Apertura browser su http://localhost:4000/login
 echo 🔑 Credenziali predefinite: admin@padel.local / admin123
 echo.
 
-start http://localhost:4000
+start http://localhost:4000/login
 
 cd backend
 node server.js

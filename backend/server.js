@@ -8,8 +8,39 @@ const express = require("express");
 const cors    = require("cors");
 const jwt     = require("jsonwebtoken");
 const bcrypt  = require("bcryptjs");
+const fs      = require("fs");
+const path    = require("path");
 const db      = require("./db");
 const config  = require("./config");
+
+// Helper per aggiornare il file .env e la configurazione in memoria
+function updateEnvClubName(newClubName) {
+  if (!newClubName || typeof newClubName !== "string") return;
+  const trimmed = newClubName.trim();
+  if (!trimmed) return;
+
+  const envPath = path.join(__dirname, ".env");
+  try {
+    let envContent = "";
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, "utf-8");
+      if (/^CLUB_NAME=.*$/m.test(envContent)) {
+        envContent = envContent.replace(/^CLUB_NAME=.*$/m, `CLUB_NAME=${trimmed}`);
+      } else {
+        envContent += `\nCLUB_NAME=${trimmed}\n`;
+      }
+    } else {
+      envContent = `CLUB_NAME=${trimmed}\n`;
+    }
+    fs.writeFileSync(envPath, envContent, "utf-8");
+    console.log(`✅ CLUB_NAME salvato in .env: "${trimmed}"`);
+  } catch (err) {
+    console.error("Errore salvataggio CLUB_NAME in .env:", err.message);
+  }
+
+  process.env.CLUB_NAME = trimmed;
+  config.clubName = trimmed;
+}
 
 const app = express();
 app.use(cors({ origin: "*", credentials: true }));
@@ -261,7 +292,7 @@ app.post("/api/login", async (req, res) => {
 
 app.post("/api/change-password", auth, async (req, res) => {
   try {
-    const { newPassword, currentPassword } = req.body;
+    const { newPassword, currentPassword, clubName } = req.body;
     if (!newPassword || newPassword.trim().length < 6) {
       return res.status(400).json({ msg: "La nuova password deve contenere almeno 6 caratteri" });
     }
@@ -278,6 +309,11 @@ app.post("/api/change-password", auth, async (req, res) => {
       return res.status(400).json({ msg: "Password attuale non corretta" });
     }
 
+    // Se fornito il nome del club, salvalo in .env e aggiorna la configurazione attiva
+    if (clubName && clubName.trim()) {
+      updateEnvClubName(clubName.trim());
+    }
+
     const hashed = await bcrypt.hash(newPassword.trim(), 10);
     await db.players.updateAsync(
       { _id: player._id },
@@ -292,7 +328,8 @@ app.post("/api/change-password", auth, async (req, res) => {
 
     res.json({
       success: true,
-      msg: "Password aggiornata con successo!",
+      msg: "Configurazione salvata con successo!",
+      clubName: config.clubName,
       player: {
         id: player._id,
         email: player.email,
@@ -303,6 +340,19 @@ app.post("/api/change-password", auth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ msg: "Errore cambio password", error: err.message });
+  }
+});
+
+app.put("/api/admin/club-name", auth, adminOnly, async (req, res) => {
+  try {
+    const { clubName } = req.body;
+    if (!clubName || !clubName.trim()) {
+      return res.status(400).json({ msg: "Nome del club non valido" });
+    }
+    updateEnvClubName(clubName.trim());
+    res.json({ success: true, clubName: config.clubName, msg: "Nome del club aggiornato con successo!" });
+  } catch (err) {
+    res.status(500).json({ msg: "Errore aggiornamento nome club", error: err.message });
   }
 });
 
@@ -1316,8 +1366,6 @@ function shuffle(arr) {
 // If frontend/dist exists alongside the backend, serve it statically.
 // This lets you run just `node server.js` from the backend folder
 // and access the full app at http://localhost:4000
-const path = require("path");
-const fs   = require("fs");
 const frontendDist = path.join(__dirname, "..", "frontend", "dist");
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));

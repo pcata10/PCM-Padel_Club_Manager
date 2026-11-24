@@ -36,13 +36,13 @@ fi
 
 # Serve frontend dist statically from backend
 echo ""
-echo "✅ All ready! Opening http://localhost:4000"
+echo "✅ All ready! Opening http://localhost:4000/login"
 echo "🔑 Default login: admin@padel.local / admin123"
 echo ""
 
 # Automatically open browser on Mac
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  (sleep 1 && open "http://localhost:4000") &
+  (sleep 1 && open "http://localhost:4000/login") &
 fi
 
 # Start backend (serves API + static frontend)

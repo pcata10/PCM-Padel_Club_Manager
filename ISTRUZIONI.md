@@ -62,12 +62,14 @@ All'avvio, l'applicazione dispone di un account amministratore predefinito:
 
 *(Nella schermata di login è presente anche il comodo pulsante **"⚡ Compila credenziali predefinite"** per inserirle con un solo tocco).*
 
-### 🔐 Cambio Password Obbligatorio al Primo Accesso
-Per garantire la massima sicurezza a chi utilizza l'applicazione:
+### 🔐 Configurazione Iniziale e Cambio Password al Primo Accesso
+Per garantire la massima sicurezza e personalizzazione fin dal primo utilizzo:
 1. Al **primo login** con la password iniziale `admin123`, l'applicazione rileva automaticamente il primo accesso e mostra la schermata dedicata: **"Primo Accesso Rilevato"**.
-2. Ti verrà chiesto di inserire e confermare una **nuova password personale** (minimo 6 caratteri).
-3. Una volta salvata, la password iniziale `admin123` viene sostituita per sempre e l'amministratore entra direttamente nel pannello di gestione.
-4. In qualsiasi momento successivo, l'amministratore può modificare nuovamente la password cliccando sul pulsante **"🔑 Password"** nella barra di navigazione in alto.
+2. Ti verrà chiesto di compilare:
+   - **Nome del Tuo Circolo / Club Padel:** (es. *"Padel Club Roma"* o *"Sporting Club"*). Questo valore viene salvato automaticamente nella variabile `CLUB_NAME` del file `.env` e personalizza subito l'intestazione, il menu e tutti i tabelloni.
+   - **Nuova Password Personale** e **Conferma Nuova Password** (minimo 6 caratteri).
+3. Cliccando su **"Salva Nuova Password ed Entra 🚀"**, la configurazione viene salvata all'istante, la password di default `admin123` viene sostituita per sempre e l'amministratore accede al pannello con il nome del proprio circolo già visibile nel menu.
+4. In qualsiasi momento successivo, l'amministratore può modificare sia il nome del circolo che la password cliccando sul pulsante **"⚙️ Impostazioni"** nella barra di navigazione in alto.
 
 ---
 
@@ -120,18 +122,22 @@ Per permettere a giocatori e pubblico di seguire l'andamento del torneo **in tot
 
 ## 6. Come Personalizzare il Nome del Circolo
 
-Per personalizzare il nome che appare nella barra di navigazione e nell'applicazione:
+Puoi personalizzare il nome del circolo in due modi semplicissimi:
 
+### Metodo 1: Direttamente dall'interfaccia (Consigliato)
+- Al primo login, l'applicazione ti chiede subito di inserire il nome del club.
+- In qualunque momento successivo, puoi cliccare sul pulsante **"⚙️ Impostazioni"** nella barra di navigazione in alto e modificare il campo **"Nome del Circolo / Club"**. Il sistema aggiornerà automaticamente il file `.env` e i menu in tempo reale!
+
+### Metodo 2: Modificando manualmente il file .env
 1. Apri con il Blocco Note (o qualsiasi editor) il file:
    ```text
    backend/.env
    ```
-2. Modifica queste due righe con il nome del club:
+2. Modifica la riga:
    ```env
    CLUB_NAME=Padel Club Roma
-   CLUB_SHORT_NAME=PC Roma
    ```
-3. Salva il file e riavvia il server.
+3. Salva il file. Al prossimo avvio l'applicazione caricherà il nuovo nome.
 
 ---
 

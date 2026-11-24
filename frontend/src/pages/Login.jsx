@@ -17,6 +17,7 @@ export default function Login() {
   // Stato per cambio password obbligatorio al primo login
   const [isFirstLogin, setIsFirstLogin] = useState(false);
   const [tempAuth, setTempAuth] = useState(null); // { token, player }
+  const [clubName, setClubName] = useState("");
   const [passwordForm, setPasswordForm] = useState({
     newPassword: "",
     confirmPassword: "",
@@ -66,6 +67,10 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
 
+    if (!clubName || !clubName.trim()) {
+      return setError("Inserisci il nome del tuo circolo / club");
+    }
+
     const { newPassword, confirmPassword } = passwordForm;
 
     if (!newPassword || newPassword.length < 6) {
@@ -84,7 +89,10 @@ export default function Login() {
     try {
       await axios.post(
         `${API}/api/change-password`,
-        { newPassword },
+        {
+          newPassword,
+          clubName: clubName.trim(),
+        },
         { headers: { Authorization: `Bearer ${tempAuth.token}` } }
       );
 
@@ -102,10 +110,10 @@ export default function Login() {
       );
       axios.defaults.headers.common["Authorization"] = `Bearer ${tempAuth.token}`;
 
-      setSuccessMsg("✅ Password impostata con successo! Accesso in corso...");
+      setSuccessMsg("✅ Configurazione salvata! Accesso al pannello in corso...");
 
       setTimeout(() => {
-        navigate("/admin/tournaments");
+        window.location.href = "/admin/tournaments";
       }, 1000);
     } catch (err) {
       setError(err.response?.data?.msg || "Errore durante il salvataggio della nuova password");
@@ -212,6 +220,26 @@ export default function Login() {
             </div>
 
             <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center justify-between">
+                  <span>Nome del Circolo / Club Padel *</span>
+                  <span className="text-[10px] text-emerald-700 font-bold lowercase bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    variabile .env
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={clubName}
+                  onChange={(e) => setClubName(e.target.value)}
+                  placeholder="es. Padel Club Roma"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-slate-800 font-bold text-sm"
+                  required
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Questo nome personalizzerà il menu, i tabelloni e verrà salvato nel file <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">.env</code>.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
                   Nuova Password (min. 6 caratteri)

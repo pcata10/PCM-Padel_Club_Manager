@@ -3,6 +3,7 @@ import axios from "axios";
 import html2canvas from "html2canvas";
 import NavBar from "../components/NavBar";
 import SponsorFooter from "../components/SponsorFooter";
+import { useConfig } from "../hooks/useConfig";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
@@ -376,6 +377,7 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
 // COMPONENTE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 export default function AdminTournaments() {
+  const config = useConfig();
   const [tournaments, setTournaments] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
   const [courts, setCourts] = useState([]);
@@ -772,7 +774,9 @@ export default function AdminTournaments() {
       <div className="max-w-5xl mx-auto px-4 md:px-6 pt-10 pb-20 space-y-6">
         {/* ── HEADER ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-3xl font-bold text-slate-800">🏆 Gestione Tornei</h1>
+          <h1 className="text-3xl font-bold text-slate-800">
+            🏆 Gestione Tornei{config.clubName && config.clubName !== "Gestione Tornei" ? ` • ${config.clubName}` : ""}
+          </h1>
           <button
             onClick={() => {
               setShowForm(!showForm);
