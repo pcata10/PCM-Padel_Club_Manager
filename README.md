@@ -38,7 +38,7 @@
 - **💾 100% Locale & Offline:** Funziona senza connessione internet. Nessun server cloud da pagare, nessun servizio esterno.
 - **📁 Database File Integrato (NeDB):** I dati (tornei, gironi, match, coppie, utenti) vengono salvati in file testuali leggeri nella cartella `backend/data/*.db`. Non serve installare né configurare MongoDB o MySQL.
 - **🚀 Portatile su Pen Drive USB:** Puoi copiare l'intera cartella su una chiavetta USB e avviarla su qualsiasi computer Windows, Mac o Linux.
-- **🔄 Auto-installazione Node.js su Windows:** Lo script `start-local.bat` rileva in automatico se Node.js è presente; se manca, lo scarica e installa silenziosamente.
+- **🔄 Auto-Setup Completo & Rilevamento Node.js (Windows, Mac e Linux):** Gli script di avvio verificano automaticamente la presenza di Node.js. Se manca, avviano il download e l'installazione, verificano le dipendenze e compilano il frontend in autonomia.
 - **📺 Tabellone TV & Live Spettatori:** Pagina pubblica protetta in sola lettura (`/live`), ideale per proiettare i risultati in tempo reale sulla TV della club house o permettere ai giocatori di seguire i match dallo smartphone.
 
 ---
@@ -127,18 +127,27 @@ sequenceDiagram
 
 ## 🚀 Avvio Rapido (in 1 Clic)
 
+Entrambi gli script sono progettati per funzionare **al primo colpo senza configurazioni manuali**: controllano la presenza di Node.js, installano le dipendenze se mancanti, compilano il frontend e aprono automaticamente il browser.
+
 ### 💻 Su Windows
 Fai doppio clic sul file:
 ```cmd
 start-local.bat
 ```
-Lo script installerà Node.js se mancante, avvierà il server locale e aprirà automaticamente il browser su **`http://localhost:4000`**.
+- Controlla se Node.js è presente; se manca, scarica e installa automaticamente la versione LTS ufficiale da `nodejs.org` in background.
+- Verifica le dipendenze (`backend/node_modules/` e `frontend/dist/`).
+- Avvia il server e apre il browser all'indirizzo **`http://localhost:4000/login`**.
 
-### 🍎 Su Mac / Linux
-Apri il terminale nella cartella del progetto ed esegui:
+### 🍎 Su Mac e Linux
+Apri il terminale nella cartella del progetto (oppure fai doppio clic da Finder su macOS) ed esegui:
 ```bash
 ./start-local.sh
 ```
+- Include automaticamente i percorsi di sistema (`/usr/local/bin`, `/opt/homebrew/bin`, `nvm`).
+- Se Node.js non è installato:
+  - **Su macOS:** lo installa via Homebrew oppure scarica l'installer ufficiale `.pkg` e avvia la procedura guidata di Apple.
+  - **Su Linux:** tenta l'installazione automatica tramite il gestore di pacchetti (`apt`, `dnf` o `pacman`).
+- Installa le dipendenze, compila il frontend se necessario e apre automaticamente il browser con `open` (macOS) o `xdg-open` (Linux).
 
 ---
 
@@ -158,8 +167,8 @@ Apri il terminale nella cartella del progetto ed esegui:
 
 ```text
 PC-PadelProject/
-├── start-local.bat             # Avvio automatico per Windows (con auto-install Node.js)
-├── start-local.sh              # Avvio automatico per Mac / Linux
+├── start-local.bat             # Avvio automatico per Windows (con auto-setup e installazione Node.js)
+├── start-local.sh              # Avvio automatico per Mac / Linux (con auto-setup e verifica Node.js)
 ├── ISTRUZIONI.md               # Manuale utente completo e guida per chiavetta USB
 ├── README.md                   # Questa documentazione
 │
