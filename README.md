@@ -1,308 +1,221 @@
 <p align="center">
   <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=white" />
   <img src="https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=node.js&logoColor=white" />
-  <img src="https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
+  <img src="https://img.shields.io/badge/Database-NeDB%20Locale-FF6F00?style=for-the-badge&logo=databricks&logoColor=white" />
   <img src="https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
   <img src="https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/Offline-100%25%20Portable-success?style=for-the-badge" />
 </p>
 
-<h1 align="center">🎾 Padel Club Manager</h1>
+<h1 align="center">🏆 Gestione Tornei Padel</h1>
 
 <p align="center">
-  <strong>Una piattaforma completa per la gestione di un club di padel.</strong><br/>
-  Prenotazione campi, gestione tornei, pannello admin e report mensili — tutto in un'unica web app moderna e responsive.
+  <strong>Software professionale e portatile per l'organizzazione e la gestione di tornei di padel.</strong><br/>
+  100% offline, nessun database esterno da configurare, ideale per circoli sportivi ed eseguibile direttamente da <strong>chiavetta USB</strong>.
 </p>
 
 <p align="center">
-  <a href="ISTRUZIONI.md"><strong>📖 GUIDA &amp; ISTRUZIONI COMPLETE PER CHIAVETTA USB (CLICCA QUI)</strong></a><br/><br/>
-  <a href="#-features">Features</a> •
-  <a href="#-screenshots">Screenshots</a> •
-  <a href="#%EF%B8%8F-tech-stack">Tech Stack</a> •
-  <a href="#-getting-started">Getting Started</a> •
-  <a href="#-struttura-progetto">Struttura</a> •
-  <a href="#-api-endpoints">API</a>
+  <a href="ISTRUZIONI.md"><strong>📖 GUIDA COMPLETA &amp; MANUALE UTENTE (ISTRUZIONI.md)</strong></a><br/><br/>
+  <a href="#-panoramica">Panoramica</a> •
+  <a href="#-formule-di-torneo">Formule Torneo</a> •
+  <a href="#-schermo-tv--vista-live-pubblica">Vista TV Live</a> •
+  <a href="#-primo-accesso--sicurezza">Primo Accesso</a> •
+  <a href="#-avvio-rapido-in-1-clic">Avvio Rapido</a> •
+  <a href="#%EF%B8%8F-architettura--tecnologie">Tech Stack</a> •
+  <a href="#-struttura-del-progetto">Struttura</a>
 </p>
 
 ---
 
-## ✨ Features
-
-### 👤 Area Utente
-- **Registrazione e login** con autenticazione JWT (commentata nel codice)
-- **Prenotazione campi** con visualizzazione disponibilità in tempo reale (slot da 1h30min)
-- **Dashboard personale** con le proprie prenotazioni e possibilità di cancellazione
-- **Iscrizione tornei** — singola o in coppia, con ricerca partner e registrazione ospiti 
-- **Notifiche email** automatiche quando si viene aggiunti a una partita
-
-### ⚙️ Pannello Amministratore
-- **Timeline interattiva** con vista giornaliera per tutti i campi (indoor + outdoor)
-- **Gestione prenotazioni** — blocco slot, academy 🎓, lezioni private 👨‍🏫
-- **Slider 21 giorni** per navigare rapidamente tra le date
-- **Riepilogo giornaliero** con dettaglio eventi per campo
-- **Gestione giocatori** — lista completa, ruoli, livelli
-
-### 🏆 Gestione Tornei (commentata nel codice)
-- **Creazione e configurazione** tornei con campi, orari e livello
-- **Gestione coppie** con teste di serie e gironi
-- **Tabellone automatico** — fase Gold 🥇 e Silver 🥈 con aggiornamento risultati live
-- **Iscrizioni self-service** per gli utenti dalla dashboard
-
-### 📊 Report & Analytics
-- **Report mensile** con KPI cards: prenotazioni, incasso, ore Academy, ore Lezioni
-- **Dettaglio per campo** con statistiche e revenue
-- **Grafico prenotazioni per giorno** 
-- **Dettaglio lezioni coach** con note e ore per sessione
-- **Export PDF / Stampa** integrato
-
-### 🤝 Sponsor (commentata nel codice)
-- Gestione sponsor con logo, link e ordinamento
-- Footer dinamico visibile su tutte le pagine
+> [!NOTE]
+> **Edizione Focalizzata sui Tornei:**  
+> In questa versione, i moduli per la prenotazione oraria dei campi, la timeline slot, le lezioni academy e i report mensili sono stati disattivati e commentati nel codice sorgente per offrire uno strumento super veloce, leggero, senza dipendenze cloud e focalizzato esclusivamente sull'organizzazione impeccabile dei **tornei di padel**.
 
 ---
 
-## 📱 Screenshots
+## ⚡ Panoramica & Vantaggi
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/admin-desktop.png" alt="Admin Dashboard - Desktop" /><br/>
-      <strong>Admin Dashboard — Desktop</strong><br/>
-      <sub>Timeline interattiva, slider giorni e griglia slot per campo</sub>
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/admin-mobile.png" alt="Admin Dashboard - Mobile" /><br/>
-      <strong>Admin Dashboard — Mobile</strong><br/>
-      <sub>Layout mobile-first con griglia compatta 4 colonne</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/booking-modal.png" alt="Booking Modal" /><br/>
-      <strong>Prenotazione Campo</strong><br/>
-      <sub>Modal di prenotazione con tipo (Prenota/Academy/Lezione), giocatori e orario per gli ADMIN</sub>
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/report.png" alt="Report Mensile" /><br/>
-      <strong>Report Mensile</strong><br/>
-      <sub>KPI cards con prenotazioni, incasso, ore Academy e Lezioni per gli ADMIN</sub>
-    </td>
-  </tr>
-</table>
+- **💾 100% Locale & Offline:** Funziona senza connessione internet. Nessun server cloud da pagare, nessun servizio esterno.
+- **📁 Database File Integrato (NeDB):** I dati (tornei, gironi, match, coppie, utenti) vengono salvati in file testuali leggeri nella cartella `backend/data/*.db`. Non serve installare né configurare MongoDB o MySQL.
+- **🚀 Portatile su Pen Drive USB:** Puoi copiare l'intera cartella su una chiavetta USB e avviarla su qualsiasi computer Windows, Mac o Linux.
+- **🔄 Auto-installazione Node.js su Windows:** Lo script `start-local.bat` rileva in automatico se Node.js è presente; se manca, lo scarica e installa silenziosamente.
+- **📺 Tabellone TV & Live Spettatori:** Pagina pubblica protetta in sola lettura (`/live`), ideale per proiettare i risultati in tempo reale sulla TV della club house o permettere ai giocatori di seguire i match dallo smartphone.
 
 ---
 
-## 🛠️ Tech Stack
+## 🎾 Formule di Torneo Supportate
 
-| Layer | Tecnologia |
-|-------|-----------|
-| **Frontend** | React 18, Vite 7, Tailwind CSS 3.4, React Router 6 |
-| **Backend** | Node.js, Express, Mongoose |
-| **Database** | MongoDB Atlas |
-| **Auth** | JWT (jsonwebtoken + bcryptjs) |
-| **Email** | Nodemailer (SMTP) |
-| **Calendar** | FullCalendar (opzionale, componente timeline) |
-| **Deploy** | Vercel (frontend), qualsiasi hosting Node (backend) |
+L'applicazione gestisce le 3 formule sportive più diffuse nei club:
+
+```mermaid
+flowchart TD
+    T["🏆 Formule Torneo"] --> G["1. Solo Gironi (Round-Robin)"]
+    T --> K["2. Eliminazione Diretta (Knockout)"]
+    T --> M["3. Gironi + Eliminazione (Gold & Silver)"]
+
+    G --> G1["Solo Andata • Classifica V/S automatica"]
+    K --> K1["Teste di Serie ⭐ opposte • BYE 🚀 automatici"]
+    M --> M1["Fase a Gironi di qualificazione"]
+    M1 --> M2["🥇 Tabellone Gold (Prime 2 con incrocio federale)"]
+    M1 --> M3["🥈 Tabellone Silver (Terze classificate)"]
+```
+
+### 1. 🏆 Solo Gironi (All'italiana - Sola Andata)
+- Ogni coppia affronta ciascuna delle altre coppie del proprio girone **una sola volta** (nessun match di ritorno).
+- Classifica aggiornata in tempo reale all'inserimento di ogni risultato con vittorie ($V$), sconfitte ($S$) e posizione.
+- Visualizzazione chiara e compatta dei cognomi con tooltip per leggere i nomi completi dei giocatori.
+
+### 2. ⚡ Eliminazione Diretta (con Teste di Serie e BYE Automatici)
+- **Gestione Teste di Serie (⭐):** Le coppie con seed vengono posizionate automaticamente alle estremità opposte del tabellone (la #1 in cima e la #2 in fondo) in modo che possano affrontarsi solo in finale.
+- **Risoluzione Automatica dei BYE:** Se il numero di coppie non è una potenza di 2 (es. 10 coppie in un tabellone da 16):
+  - Il tabellone non presenta buchi o partite vuote.
+  - Le migliori coppie/teste di serie ricevono automaticamente il passaggio del turno (**`BYE 🚀`**) e vengono proiettate direttamente ai Quarti di Finale.
+  - I restanti team disputano gli Ottavi, completando alla perfezione il tabellone.
+
+### 3. 🥇🥈 Gironi + Eliminazione Diretta (Fase Gold & Silver)
+- **Fase 1 (Gironi):** Qualificazioni all'italiana con classifica sempre aggiornata.
+- **Fase 2 (Generazione Automatica con 1 Clic):**
+  - **Tabellone Gold 🥇:** Vi accedono le prime 2 classificate di ogni girone con **incrocio federale automatico** (1°A vs 2°B, 1°B vs 2°A) per evitare che squadre dello stesso girone si riaffrontino al primo turno ad eliminazione.
+  - **Tabellone Silver 🥈:** Vi accedono le terze classificate per garantire a tutti i giocatori un torneo completo e avvincente.
+- Possibilità di rigenerare o aggiornare i tabelloni in caso di modifiche ai risultati dei gironi.
 
 ---
 
-## 🚀 Getting Started
+## 📺 Schermo TV & Vista Live Pubblica (`/live`)
 
-### Prerequisiti
+Una schermata dedicata esclusivamente agli spettatori e ai giocatori, progettata per essere proiettata sui monitor o sulle Smart TV del circolo:
 
-- **Node.js** >= 18
-- **MongoDB** (locale o Atlas)
-- Un account SMTP per le notifiche email (opzionale)
-
-### 1. Clona il repository
-
-```bash
-git clone https://github.com/your-username/PC-PadelProject.git
-cd PC-PadelProject
-```
-
-### 2. Configura il Backend
-
-```bash
-cd backend
-npm install
-```
-
-Crea un file `.env` nella cartella `backend/`:
-
-```env
-MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/<db-name>
-JWT_SECRET=your-super-secret-key
-PORT=4000
-
-# Email (opzionale)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-
-# App
-APP_URL=http://localhost:5173
-
-# Club config (opzionale — sovrascrive i valori di default in config.js)
-CLUB_NAME=Il Tuo Padel Club
-CLUB_SLOT_PRICE=40
-```
-
-Avvia il server:
-
-```bash
-npm run dev    # con nodemon (sviluppo)
-# oppure
-node server.js # produzione
-```
-
-### 3. Configura il Frontend
-
-```bash
-cd frontend
-npm install
-```
-
-Crea un file `.env.local` nella cartella `frontend/`:
-
-```env
-VITE_API_URL=http://localhost:4000
-```
-
-Avvia il dev server:
-
-```bash
-npm run dev
-```
-
-L'app sarà disponibile su `http://localhost:5173`.
-
-### 4. Inizializza i campi
-
-Alla prima esecuzione, apri nel browser:
-
-```
-http://localhost:4000/api/init
-```
-
-Questo crea i campi configurati in `backend/config.js`.
+- **100% Sola Lettura (Zero Rischi):** Nessun pulsante di modifica, eliminazione o inserimento score. Chiunque visualizzi la pagina non può manomettere i dati del torneo.
+- **Aggiornamento Live Automatico (15s):** Polling automatico in tempo reale. Non appena l'organizzatore inserisce un risultato nel pannello admin, il tabellone sullo schermo TV si aggiorna da solo senza dover ricaricare la pagina.
+- **Modalità Fullscreen (⛶):** Con un solo tocco entra a tutto schermo eliminando le barre del browser.
+- **Accessibile senza Login:** Tramite link locale/Wi-Fi (es. `http://192.168.1.xxx:4000/live`), chiunque sia connesso alla rete del club può seguire il tabellone dal proprio smartphone.
 
 ---
 
-## 📂 Struttura Progetto
+## 🔐 Primo Accesso & Personalizzazione Club
 
+All'avvio, l'applicazione dispone di credenziali di fabbrica:
+- **Email:** `admin@padel.local`
+- **Password iniziale:** `admin123`
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as 👤 Amministratore
+    participant App as 💻 Interfaccia Web
+    participant Server as ⚙️ Backend Locale
+    participant Env as 📄 .env & DB
+
+    Admin->>App: Inserisce admin@padel.local / admin123
+    App->>Server: POST /api/login
+    Server-->>App: Login OK • Richiesto Primo Setup (mustChangePassword)
+    App->>Admin: Mostra schermata "Primo Accesso Rilevato"
+    Admin->>App: Inserisce Nome Club e Nuova Password Personale
+    App->>Server: POST /api/change-password
+    Server->>Env: Salva CLUB_NAME in .env e cifra password in players.db
+    Server-->>App: Setup completato con successo
+    App->>Admin: Accesso al Pannello con Menu personalizzato
 ```
+
+1. **Rilevamento Automatico:** Al primo accesso, l'app intercetta le credenziali di fabbrica e apre la schermata di configurazione iniziale.
+2. **Nome del Club:** Viene richiesto il nome del circolo (es. *Padel Club Roma*), che viene scritto automaticamente nella variabile `CLUB_NAME` del file `backend/.env`.
+3. **Nuova Password:** Viene impostata e cifrata la password personale dell'amministratore, disattivando definitivamente `admin123`.
+4. **Personalizzazione Immediata:** Il nome del circolo comparirà subito nel logo `🎾 [Nome Club]`, nel pulsante `🏆 Gestione Tornei • [Nome Club]` e in tutti i tabelloni.
+5. **Modifiche Future:** Dal pulsante **`⚙️ Impostazioni`** nella barra superiore, l'amministratore può modificare il nome del circolo e la password in qualsiasi momento.
+
+---
+
+## 🚀 Avvio Rapido (in 1 Clic)
+
+### 💻 Su Windows
+Fai doppio clic sul file:
+```cmd
+start-local.bat
+```
+Lo script installerà Node.js se mancante, avvierà il server locale e aprirà automaticamente il browser su **`http://localhost:4000`**.
+
+### 🍎 Su Mac / Linux
+Apri il terminale nella cartella del progetto ed esegui:
+```bash
+./start-local.sh
+```
+
+---
+
+## 🛠️ Architettura & Tecnologie
+
+| Layer | Componente | Descrizione |
+| :--- | :--- | :--- |
+| **Frontend** | React 18, Vite 7, TailwindCSS 3 | Interfaccia responsive, dark/light contrast, animazioni e visualizzatore tabelloni |
+| **Backend** | Node.js, Express | Server API REST locale, gestione incroci, esportazione immagini e configurazione |
+| **Database** | NeDB (embedded) | Database NoSQL su file leggeri e portabili (`backend/data/*.db`) |
+| **Autenticazione** | JWT + bcryptjs | Token di sessione e cifratura sicura delle password |
+| **Export Grafico** | html2canvas | Esportazione dei tabelloni in immagini PNG ad alta risoluzione |
+
+---
+
+## 📂 Struttura del Progetto
+
+```text
 PC-PadelProject/
+├── start-local.bat             # Avvio automatico per Windows (con auto-install Node.js)
+├── start-local.sh              # Avvio automatico per Mac / Linux
+├── ISTRUZIONI.md               # Manuale utente completo e guida per chiavetta USB
+├── README.md                   # Questa documentazione
+│
 ├── backend/
-│   ├── models/
-│   │   ├── Booking.js        # Prenotazioni utente
-│   │   ├── BlockedSlot.js    # Slot admin (prenotazioni/academy/lezioni)
-│   │   ├── Court.js          # Campi (indoor/outdoor)
-│   │   ├── Player.js         # Giocatori/utenti
-│   │   ├── Tournament.js     # Tornei con gironi e tabellone
-│   │   └── Sponsor.js        # Sponsor del club
-│   ├── config.js             # Configurazione club (campi, orari, prezzi)
-│   ├── server.js             # API Express (tutto in un file)
-│   └── .env                  # Variabili d'ambiente
+│   ├── data/                   # Cartella del database locale (file .db)
+│   │   ├── tournaments.db      # Tornei, gironi, match e tabelloni
+│   │   ├── players.db          # Amministratore e giocatori (password cifrate)
+│   │   └── courts.db           # Configurazione campi
+│   ├── config.js               # Parametri di configurazione (orari, campi)
+│   ├── server.js               # API Express, logica tornei, sorteggi e KO
+│   └── .env                    # Variabili d'ambiente (CLUB_NAME, PORT, JWT_SECRET)
 │
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Login.jsx           # Login
-│   │   │   ├── Register.jsx        # Registrazione
-│   │   │   ├── Dashboard.jsx       # Dashboard utente
-│   │   │   ├── Book.jsx            # Prenotazione campo
-│   │   │   ├── AdminDashboard.jsx  # Pannello admin
-│   │   │   ├── AdminTournaments.jsx# Gestione tornei
-│   │   │   └── Report.jsx          # Report mensile
-│   │   ├── components/
-│   │   │   ├── NavBar.jsx
-│   │   │   ├── CourtTimeline.jsx
-│   │   │   ├── CourtTimelineDashboard.jsx
-│   │   │   ├── CourtTimelineBook.jsx
-│   │   │   └── SponsorFooter.jsx
-│   │   └── App.jsx
-│   └── .env.local            # URL API
-│
-└── docs/screenshots/          # Screenshot per README
+└── frontend/
+    ├── src/
+    │   ├── pages/
+    │   │   ├── AdminTournaments.jsx # Gestione completa tornei, coppie, risultati
+    │   │   ├── PublicTournament.jsx # Vista Schermo TV / Live pubblica (sola lettura)
+    │   │   └── Login.jsx            # Accesso admin e schermata primo setup
+    │   ├── components/
+    │   │   ├── NavBar.jsx           # Barra di navigazione con impostazioni club e password
+    │   │   └── SponsorFooter.jsx    # Footer sponsor
+    │   └── hooks/
+    │       └── useConfig.js         # Hook reattivo per la configurazione del club
+    └── dist/                        # Build compilata e pronta all'uso offline
 ```
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Endpoints Principali
 
-### Auth
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `POST` | `/api/register` | Registrazione nuovo utente |
-| `POST` | `/api/login` | Login e ottenimento token JWT |
+### 🔒 Autenticazione & Setup
+- `POST /api/login` — Accesso amministratore (restituisce `mustChangePassword` se al 1° login)
+- `POST /api/change-password` — Cambio password e aggiornamento del nome club in `.env`
+- `PUT /api/admin/club-name` — Aggiornamento rapido del nome del circolo
+- `GET /api/config` — Configurazione attiva del club
 
-### Courts
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `GET` | `/api/courts` | Lista campi |
-| `GET` | `/api/slots/:courtId?date=YYYY-MM-DD` | Slot disponibili per campo e data |
-| `GET` | `/api/availability` | Disponibilità globale (bookings + blocked) |
+### 🏆 Tornei (Admin)
+- `GET /api/tournaments` — Elenco tornei con dati popolati
+- `POST /api/tournaments` — Creazione nuovo torneo
+- `POST /api/tournaments/:id/couples` — Aggiunta coppie singole o batch
+- `POST /api/tournaments/:id/draw` — Sorteggio gironi o tabellone a eliminazione diretta
+- `POST /api/tournaments/:id/generate-knockout` — Generazione tabelloni Gold e Silver
+- `PUT /api/tournaments/:id/matches/:matchId` — Salvataggio punteggio e avanzamento vincitore
 
-### Bookings
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `GET` | `/api/bookings` | Le tue prenotazioni |
-| `POST` | `/api/bookings` | Crea prenotazione (1h / 1h30min) |
-| `PATCH` | `/api/bookings/:id/players` | Aggiungi giocatori |
-| `PATCH` | `/api/bookings/:id/cancel` | Cancella prenotazione |
-
-### Admin
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `GET` | `/api/admin/bookings` | Tutte le prenotazioni attive |
-| `GET` | `/api/admin/report?month=M&year=Y` | Report mensile |
-| `POST` | `/api/blocked-slots` | Blocca slot (prenota/academy/lezione) |
-| `GET` | `/api/admin/players` | Lista giocatori |
-
-### Tornei
-| Metodo | Endpoint | Descrizione |
-|--------|----------|-------------|
-| `GET` | `/api/tournaments/public` | Tornei aperti (utenti) |
-| `POST` | `/api/tournaments` | Crea torneo (admin) |
-| `POST` | `/api/tournaments/:id/draw` | Genera tabellone |
-| `POST` | `/api/tournaments/:id/couples` | Aggiungi coppia |
+### 📺 Vista Pubblica (Sola Lettura)
+- `GET /api/public/tournaments` — Elenco tornei per monitor e spettatori (senza autenticazione)
+- `GET /api/public/tournaments/:id` — Dettaglio torneo in tempo reale (senza autenticazione)
 
 ---
 
-## ⚙️ Configurazione Club
+## 📄 Note di Versione
 
-Tutti i parametri del club sono personalizzabili in `backend/config.js` o via variabili d'ambiente:
-
-| Parametro | Default | Descrizione |
-|-----------|---------|-------------|
-| `CLUB_NAME` | Il tuo Padel Club | Nome del club |
-| `CLUB_SLOT_PRICE` | 40 | Prezzo per slot (€) |
-| `CLUB_SLOT_DURATION` | 90 | Durata slot (minuti) |
-| `CLUB_OPEN_HOUR` | 8 | Ora apertura |
-| `CLUB_CLOSE_HOUR` | 22 | Ora chiusura |
-
-I campi sono definiti nell'array `courts` di `config.js`:
-
-```javascript
-courts: [
-  { name: "Campo 1", type: "indoor", order: 1 },
-  { name: "Campo 2", type: "indoor", order: 2 },
-  { name: "Campo 3", type: "indoor", order: 3 },
-  { name: "Campo 4 Esterno", type: "outdoor", order: 4 },
-  { name: "Campo 5 Esterno", type: "outdoor", order: 5 },
-]
-```
-
----
-
-## 📄 License
-
-Questo progetto è open source e disponibile sotto la licenza [MIT](LICENSE).
+> I componenti relativi a prenotazioni campi, slot timeline, lezioni coach, reportistica economica mensile e notifiche email sono conservati nel codice sorgente e commentati. Possono essere ripristinati in qualsiasi momento qualora si desideri ritrasformare l'applicazione in una suite gestionale completa con database MongoDB.
 
 ---
 
 <p align="center">
-  Made with ❤️ for the padel community 🎾
+  Realizzato per la community del Padel 🎾 • Gestione Tornei Facile, Veloce e Portatile
 </p>
