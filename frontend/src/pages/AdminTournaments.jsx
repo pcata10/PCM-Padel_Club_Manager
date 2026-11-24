@@ -95,10 +95,21 @@ function coupleShortName(couple) {
   const s1 = couple.player1?.surname?.trim();
   const s2 = couple.player2?.surname?.trim();
   if (s1 && s2) return `${s1} / ${s2}`;
-  // fallback: primo token del nome coppia (es. "Marco Rossi / Luigi Verdi" → "Rossi / Verdi")
+  if (s1 && couple.guestName) return `${s1} / ${couple.guestName}`;
+
   if (couple.name) {
-    const parts = couple.name.split("/").map((p) => p.trim().split(" ").pop());
-    if (parts.length === 2) return parts.join(" / ");
+    const rawParts = couple.name.split("/").map((p) => p.trim());
+    if (rawParts.length === 2) {
+      // Estrae il cognome o secondo nome da ciascun giocatore
+      const extractSurname = (str) => {
+        const words = str.split(/\s+/).filter(Boolean);
+        if (words.length <= 1) return str;
+        return words.slice(1).join(" ");
+      };
+      const sur1 = extractSurname(rawParts[0]);
+      const sur2 = extractSurname(rawParts[1]);
+      return `${sur1} / ${sur2}`;
+    }
     return couple.name;
   }
   return "?";
@@ -257,25 +268,32 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
                 const c2 = resolveCouple(m.couple2);
                 const winnerId =
                   typeof m.winner === "object" ? m.winner?._id : m.winner;
+                const isBye = m.score === "BYE" || (!c2 && c1 && !!winnerId) || (!c1 && c2 && !!winnerId);
                 const isFinished = !!winnerId;
-                const isPlayable = !!c1 && !!c2;
+                const isPlayable = !!c1 && !!c2 && !isBye;
 
                 return (
                   <div
                     key={m._id || mIdx}
                     onClick={() => isPlayable && onMatchClick(m, c1, c2)}
                     className={`rounded-2xl border-2 transition-all overflow-hidden select-none shadow-sm ${isPlayable
-                        ? "cursor-pointer hover:shadow-lg hover:border-yellow-400"
-                        : "opacity-60 cursor-not-allowed"
-                      } ${isFinished
+                        ? "cursor-pointer hover:shadow-lg hover:border-yellow-400 border-slate-200 bg-white"
+                        : isBye
+                          ? "border-purple-200 bg-purple-50/20 cursor-default"
+                          : "opacity-60 cursor-not-allowed border-slate-200 bg-white"
+                      } ${isFinished && !isBye
                         ? "border-emerald-300 bg-white"
-                        : "border-slate-200 bg-white"
+                        : ""
                       }`}
                   >
                     {/* Top subheader */}
                     <div className="bg-slate-50 border-b border-slate-100 px-3 py-1 flex items-center justify-between text-[10px] font-bold text-slate-500">
                       <span>Match #{mIdx + 1}</span>
-                      {m.score ? (
+                      {isBye ? (
+                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                          BYE 🚀
+                        </span>
+                      ) : m.score ? (
                         <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-extrabold text-[10px]">
                           {m.score}
                         </span>
@@ -294,7 +312,7 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
                           (winnerId === c1?._id ||
                             winnerId?.toString() === c1?._id?.toString())
                           ? "bg-emerald-50 text-emerald-800"
-                          : winnerId
+                          : winnerId && !isBye
                             ? "bg-slate-50 text-slate-400"
                             : "bg-white text-slate-700"
                         }`}
@@ -304,14 +322,14 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
                           <span className="text-amber-500 text-[10px]">⭐</span>
                         )}
                         <span className="truncate">
-                          {c1 ? coupleShortName(c1) : "(In attesa)"}
+                          {c1 ? coupleShortName(c1) : isBye ? "(BYE — Passa il turno)" : "(In attesa)"}
                         </span>
                       </div>
                       {winnerId &&
                         (winnerId === c1?._id ||
                           winnerId?.toString() === c1?._id?.toString()) && (
                           <span className="text-emerald-600 font-extrabold text-xs ml-1">
-                            ✓
+                            ✓ {isBye ? "Qualificato" : ""}
                           </span>
                         )}
                     </div>
@@ -322,7 +340,7 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
                           (winnerId === c2?._id ||
                             winnerId?.toString() === c2?._id?.toString())
                           ? "bg-emerald-50 text-emerald-800"
-                          : winnerId
+                          : winnerId && !isBye
                             ? "bg-slate-50 text-slate-400"
                             : "bg-white text-slate-700"
                         }`}
@@ -332,14 +350,14 @@ function KnockoutBracketView({ rounds, couples, onMatchClick }) {
                           <span className="text-amber-500 text-[10px]">⭐</span>
                         )}
                         <span className="truncate">
-                          {c2 ? coupleShortName(c2) : "(In attesa)"}
+                          {c2 ? coupleShortName(c2) : isBye ? "(BYE — Passa il turno)" : "(In attesa)"}
                         </span>
                       </div>
                       {winnerId &&
                         (winnerId === c2?._id ||
                           winnerId?.toString() === c2?._id?.toString()) && (
                           <span className="text-emerald-600 font-extrabold text-xs ml-1">
-                            ✓
+                            ✓ {isBye ? "Qualificato" : ""}
                           </span>
                         )}
                     </div>
@@ -395,6 +413,7 @@ export default function AdminTournaments() {
 
   // modal conferma azioni
   const [confirmAction, setConfirmAction] = useState(null); // { title, sub, onConfirm, btnText, color }
+  const [copiedId, setCopiedId] = useState(null);
 
   // ── Fetch ────────────────────────────────────────────────────
   const fetchAll = async () => {
@@ -577,11 +596,15 @@ export default function AdminTournaments() {
   const generateDraw = async (tid, chosenFormat) => {
     const t = tournaments.find((x) => x._id === tid);
     const format = chosenFormat || t?.format || "gironi";
-    const minCouples = format === "knockout" ? 2 : 3;
+    const minCouples = format === "knockout" ? 2 : format === "gironi_knockout" ? 4 : 3;
+    const formatLabel = format === "knockout"
+      ? "l'eliminazione diretta"
+      : format === "gironi_knockout"
+        ? "gironi + eliminazione diretta"
+        : "i gironi";
     if ((t?.couples?.length || 0) < minCouples)
       return alert(
-        `Servono almeno ${minCouples} coppie per ${format === "knockout" ? "l'eliminazione diretta" : "i gironi"
-        } (${t?.couples?.length || 0} attualmente iscritte)`
+        `Servono almeno ${minCouples} coppie per ${formatLabel} (${t?.couples?.length || 0} attualmente iscritte)`
       );
 
     setDrawLoading(true);
@@ -592,6 +615,20 @@ export default function AdminTournaments() {
       setConfirmAction(null);
     } catch (err) {
       alert(err.response?.data?.msg || "Errore generazione tabellone");
+    } finally {
+      setDrawLoading(false);
+    }
+  };
+
+  const generateKnockoutFromGroups = async (tid) => {
+    setDrawLoading(true);
+    try {
+      await api.post(`/api/tournaments/${tid}/generate-knockout`);
+      await fetchAll();
+      await refreshT(tid);
+      setConfirmAction(null);
+    } catch (err) {
+      alert(err.response?.data?.msg || "Errore generazione fase eliminazione diretta");
     } finally {
       setDrawLoading(false);
     }
@@ -735,7 +772,7 @@ export default function AdminTournaments() {
       <div className="max-w-5xl mx-auto px-4 md:px-6 pt-10 pb-20 space-y-6">
         {/* ── HEADER ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-3xl font-bold text-slate-800">🏆 Tornei</h1>
+          <h1 className="text-3xl font-bold text-slate-800">🏆 Gestione Tornei</h1>
           <button
             onClick={() => {
               setShowForm(!showForm);
@@ -827,9 +864,12 @@ export default function AdminTournaments() {
                   }
                   className="w-full p-3 border-2 border-gray-200 rounded-2xl text-sm font-semibold text-slate-800"
                 >
-                  <option value="gironi">🏆 Torneo a Gironi (All'italiana)</option>
+                  <option value="gironi">🏆 Solo Gironi (All'italiana)</option>
                   <option value="knockout">
                     ⚡ Eliminazione Diretta (Tabellone KO)
+                  </option>
+                  <option value="gironi_knockout">
+                    🥇🥈 Gironi + Eliminazione Diretta (Gold &amp; Silver)
                   </option>
                 </select>
               </div>
@@ -952,12 +992,16 @@ export default function AdminTournaments() {
                           className={
                             t.format === "knockout"
                               ? "bg-purple-100 text-purple-700 font-bold"
-                              : "bg-amber-100 text-amber-700 font-bold"
+                              : t.format === "gironi_knockout"
+                                ? "bg-gradient-to-r from-amber-100 to-purple-100 text-amber-800 font-bold"
+                                : "bg-amber-100 text-amber-700 font-bold"
                           }
                         >
                           {t.format === "knockout"
                             ? "⚡ Eliminazione Diretta"
-                            : "🏆 Gironi"}
+                            : t.format === "gironi_knockout"
+                              ? "🥇🥈 Gironi + KO"
+                              : "🏆 Solo Gironi"}
                         </Badge>
                         <Badge
                           className={
@@ -1022,9 +1066,18 @@ export default function AdminTournaments() {
                       </div>
                     </div>
                     <div
-                      className="flex gap-2 shrink-0"
+                      className="flex gap-2 shrink-0 items-center"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <a
+                        href={`/live?id=${t._id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-xl font-bold hover:bg-emerald-100 transition-all flex items-center gap-1 shadow-xs"
+                        title="Apri pagina di sola lettura per schermo TV o spettatori"
+                      >
+                        📺 Vista Live
+                      </a>
                       <button
                         onClick={() => startEdit(t)}
                         className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl font-semibold hover:bg-blue-200"
@@ -1054,6 +1107,37 @@ export default function AdminTournaments() {
                   {/* ── Dettaglio espandibile ── */}
                   {isOpen && (
                     <div className="border-t border-gray-100">
+                      {/* Banner Vista Schermo / TV / Spettatori */}
+                      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border-b border-emerald-100 px-5 py-3 flex items-center justify-between flex-wrap gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                          <span>
+                            <strong>Schermo TV & Spettatori:</strong> Pagina pubblica in sola visualizzazione (aggiornamento live automatico, protetta da modifiche accidentali).
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              const url = `${window.location.origin}/live?id=${t._id}`;
+                              navigator.clipboard.writeText(url);
+                              setCopiedId(t._id);
+                              setTimeout(() => setCopiedId(null), 2500);
+                            }}
+                            className="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-xl font-bold hover:bg-slate-50 transition-all flex items-center gap-1 shadow-xs"
+                          >
+                            {copiedId === t._id ? "✅ Link Copiato!" : "📋 Copia Link Live"}
+                          </button>
+                          <a
+                            href={`/live?id=${t._id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-1 shadow-xs"
+                          >
+                            📺 Apri Vista Schermo ↗
+                          </a>
+                        </div>
+                      </div>
+
                       {/* Tab bar */}
                       <div className="flex border-b border-gray-100 bg-slate-50">
                         {TABS.map((tab) => (
@@ -1277,315 +1361,555 @@ export default function AdminTournaments() {
                                   </p>
                                 )}
                               </div>
-                              <button
-                                onClick={() =>
-                                  setConfirmAction({
-                                    title: t.groups?.length > 0 ? "Rigenerare tabellone?" : "Generare tabellone?",
-                                    sub: "Tutti i risultati e i match esistenti verranno resettati.",
-                                    onConfirm: () => generateDraw(t._id),
-                                    btnText: "Genera ora",
-                                    color: "from-amber-500 to-orange-600",
-                                  })
-                                }
-                                disabled={
-                                  drawLoading || (t.couples?.length || 0) < 3
-                                }
-                                className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all ${(t.couples?.length || 0) < 3
-                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                  : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
-                                  }`}
-                              >
-                                {drawLoading
-                                  ? "⏳ Generando..."
-                                  : t.groups?.length > 0
-                                    ? "🔄 Rigenera"
-                                    : "🎲 Genera tabellone"}
-                              </button>
+                              <div className="flex gap-2 flex-wrap">
+                                <button
+                                  onClick={() =>
+                                    setConfirmAction({
+                                      title: (t.groups?.length > 0 || t.knockoutRounds?.length > 0) ? "Rigenerare tabellone?" : "Generare tabellone?",
+                                      sub: "Tutti i risultati e i match esistenti verranno resettati.",
+                                      onConfirm: () => generateDraw(t._id),
+                                      btnText: "Genera ora",
+                                      color: "from-amber-500 to-orange-600",
+                                    })
+                                  }
+                                  disabled={
+                                    drawLoading || (t.couples?.length || 0) < (t.format === "knockout" ? 2 : t.format === "gironi_knockout" ? 4 : 3)
+                                  }
+                                  className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all ${(t.couples?.length || 0) < (t.format === "knockout" ? 2 : t.format === "gironi_knockout" ? 4 : 3)
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
+                                    }`}
+                                >
+                                  {drawLoading
+                                    ? "⏳ Generando..."
+                                    : (t.groups?.length > 0 || t.knockoutRounds?.length > 0)
+                                      ? "🔄 Rigenera"
+                                      : "🎲 Genera tabellone"}
+                                </button>
+
+                                {/* Pulsante per generare fase KO Gold e Silver da gironi */}
+                                {t.groups?.length > 0 && (
+                                  <button
+                                    onClick={() =>
+                                      setConfirmAction({
+                                        title: t.knockoutGold?.length > 0 ? "Rigenerare tabelloni Gold & Silver?" : "Generare fase Gold & Silver?",
+                                        sub: "Verranno calcolate le classifiche dei gironi (1° e 2° per la fase Gold, 3° e successive per la fase Silver) e generati i tabelloni a eliminazione diretta con incroci automatici.",
+                                        onConfirm: () => generateKnockoutFromGroups(t._id),
+                                        btnText: t.knockoutGold?.length > 0 ? "🔄 Rigenera Gold & Silver" : "🏆 Genera Gold & Silver",
+                                        color: "from-amber-500 to-yellow-600",
+                                      })
+                                    }
+                                    disabled={drawLoading}
+                                    className="text-sm px-4 py-2 rounded-xl font-semibold transition-all bg-gradient-to-r from-amber-500 to-yellow-500 text-white hover:shadow-lg shadow-sm"
+                                  >
+                                    {t.knockoutGold?.length > 0 ? "🔄 Rigenera Gold & Silver" : "🥇 Genera Gold & Silver"}
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
-                            {(t.couples?.length || 0) < 3 && (
+                            {(t.couples?.length || 0) < (t.format === "knockout" ? 2 : t.format === "gironi_knockout" ? 4 : 3) && (
                               <div className="bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3 text-sm text-yellow-700 mb-4">
-                                ⚠️ Servono almeno 3 coppie (
+                                ⚠️ Servono almeno {t.format === "knockout" ? 2 : t.format === "gironi_knockout" ? 4 : 3} coppie (
                                 {t.couples?.length || 0} iscritte)
                               </div>
                             )}
 
-                            {!t.groups?.length ? (
+                            {/* ═══ FORMAT: KNOCKOUT (Eliminazione diretta pura) ═══ */}
+                            {t.format === "knockout" && (
+                              <>
+                                {!t.knockoutRounds?.length ? (
+                                  <EmptyState
+                                    icon="⚡"
+                                    title="Tabellone non ancora generato"
+                                    sub='Aggiungi le coppie (min. 2) e clicca "Genera tabellone"'
+                                  />
+                                ) : (
+                                  <div id="tournament-draw-capture" className="space-y-6">
+                                    <KnockoutBracketView
+                                      rounds={t.knockoutRounds}
+                                      couples={t.couples}
+                                      onMatchClick={(m, c1, c2) => {
+                                        setScoreModal({
+                                          matchId: m._id,
+                                          tournamentId: t._id,
+                                          c1,
+                                          c2,
+                                        });
+                                        setScoreForm({
+                                          score: m.score || "",
+                                          winner:
+                                            typeof m.winner === "object"
+                                              ? m.winner?._id?.toString()
+                                              : m.winner?.toString() || "",
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* ═══ FORMAT: GIRONI (Solo gironi, senza Gold & Silver ancora generati) ═══ */}
+                            {(t.format === "gironi" && (!t.knockoutGold || t.knockoutGold.length === 0)) && (
+                              <>
+                                {!t.groups?.length ? (
+                                  <EmptyState
+                                    icon="🎲"
+                                    title="Tabellone non ancora generato"
+                                    sub='Aggiungi le coppie (min. 3) e clicca "Genera tabellone"'
+                                  />
+                                ) : (
+                                  <div id="tournament-draw-capture" className="space-y-8">
+                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                                      <h4 className="font-bold text-slate-700 text-base">
+                                        Fase a Gironi
+                                      </h4>
+                                      <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full">
+                                        🎾 Formula: Solo Andata (1 match per coppia)
+                                      </span>
+                                    </div>
+                                    {/* Gironi */}
+                                    <div
+                                      className={`grid gap-4 ${t.groups.length <= 2
+                                        ? "grid-cols-1 md:grid-cols-2"
+                                        : t.groups.length === 3
+                                          ? "grid-cols-1 md:grid-cols-3"
+                                          : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+                                        }`}
+                                    >
+                                      {t.groups.map((group) => {
+                                        const ranking = groupRanking(t, group._id || group.name);
+                                        const gMatches = group.matches || [];
+                                        const done = gMatches.filter((m) => m.winner).length;
+
+                                        return (
+                                          <div
+                                            key={group._id || group.name}
+                                            className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
+                                          >
+                                            <div className="px-4 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 flex items-center justify-between">
+                                              <span className="font-bold text-white text-sm">
+                                                {group.name}
+                                              </span>
+                                              <span className="text-xs text-white/60">
+                                                {done}/{gMatches.length} ✓
+                                              </span>
+                                            </div>
+
+                                            {/* Classifica */}
+                                            <div className="px-3 py-2 border-b border-gray-100 space-y-1">
+                                              {ranking.map((s, idx) => (
+                                                <div
+                                                  key={s.id}
+                                                  className="flex items-center justify-between text-xs py-1"
+                                                >
+                                                  <div className="flex items-center gap-1.5 min-w-0">
+                                                    <span
+                                                      className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${idx === 0
+                                                        ? "bg-amber-400 text-white"
+                                                        : idx === 1
+                                                          ? "bg-slate-300 text-slate-700"
+                                                          : "bg-gray-100 text-gray-400"
+                                                        }`}
+                                                    >
+                                                      {idx + 1}
+                                                    </span>
+                                                    {s.couple?.seeded && (
+                                                      <span className="text-amber-500 text-[10px] shrink-0">
+                                                        ⭐
+                                                      </span>
+                                                    )}
+                                                    <span
+                                                      className={`font-semibold truncate ${idx > 1 ? "text-gray-400" : "text-slate-700"}`}
+                                                    >
+                                                      {coupleShortName(s.couple)}
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                                                    <span className="text-green-600 font-bold">
+                                                      {s.wins}V
+                                                    </span>
+                                                    <span className="text-red-400">
+                                                      {s.losses}S
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+
+                                            {/* Match del girone */}
+                                            <div className="px-3 py-2 space-y-1.5">
+                                              {gMatches.map((m) => {
+                                                const c1 = t.couples.find(
+                                                  (c) =>
+                                                    c._id?.toString() ===
+                                                    (typeof m.couple1 === "object" ? m.couple1?._id?.toString() : m.couple1?.toString()),
+                                                );
+                                                const c2 = t.couples.find(
+                                                  (c) =>
+                                                    c._id?.toString() ===
+                                                    (typeof m.couple2 === "object" ? m.couple2?._id?.toString() : m.couple2?.toString()),
+                                                );
+                                                const winnerId = typeof m.winner === "object" ? m.winner?._id?.toString() : m.winner?.toString();
+                                                return (
+                                                  <div
+                                                    key={m._id}
+                                                    onClick={() => {
+                                                      setScoreModal({
+                                                        matchId: m._id,
+                                                        tournamentId: t._id,
+                                                        c1,
+                                                        c2,
+                                                      });
+                                                      setScoreForm({
+                                                        score: m.score || "",
+                                                        winner: winnerId || "",
+                                                      });
+                                                    }}
+                                                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs md:text-sm cursor-pointer transition-all ${winnerId
+                                                      ? "bg-green-50 border border-green-200 hover:bg-green-100"
+                                                      : "bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-300"
+                                                      }`}
+                                                  >
+                                                    <span
+                                                      title={coupleFullName(c1)}
+                                                      className={`flex-1 min-w-0 font-bold truncate ${winnerId === c1?._id?.toString()
+                                                        ? "text-green-700"
+                                                        : "text-slate-800"
+                                                        }`}
+                                                    >
+                                                      {coupleShortName(c1)}
+                                                    </span>
+                                                    <span
+                                                      className={`mx-2 px-2 py-0.5 rounded-full font-extrabold text-[11px] shrink-0 ${m.score
+                                                        ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                                                        : "bg-white text-slate-500 border border-slate-200"
+                                                        }`}
+                                                    >
+                                                      {m.score || "vs"}
+                                                    </span>
+                                                    <span
+                                                      title={coupleFullName(c2)}
+                                                      className={`flex-1 min-w-0 font-bold truncate text-right ${winnerId === c2?._id?.toString()
+                                                        ? "text-green-700"
+                                                        : "text-slate-800"
+                                                        }`}
+                                                    >
+                                                      {coupleShortName(c2)}
+                                                    </span>
+                                                    <span className="ml-2 shrink-0">
+                                                      {winnerId ? "✅" : "✏️"}
+                                                    </span>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* ═══ FORMAT: GIRONI + KNOCKOUT (Gold & Silver) o Gironi con KO generati ═══ */}
+                            {(t.format === "gironi_knockout" || (t.knockoutGold && t.knockoutGold.length > 0)) && (
+                              <>
+                                {!t.groups?.length ? (
+                                  <EmptyState
+                                    icon="🎲"
+                                    title="Tabellone non ancora generato"
+                                    sub='Aggiungi le coppie (min. 4) e clicca "Genera tabellone"'
+                                  />
+                                ) : (
+                                  <div id="tournament-draw-capture" className="space-y-8">
+                                    {/* Info box fasi */}
+                                    <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                                      {[
+                                        {
+                                          icon: "⬡",
+                                          label: "Fase Gironi",
+                                          desc: "Solo andata",
+                                          color: "bg-slate-100 text-slate-600",
+                                        },
+                                        {
+                                          icon: "🥇",
+                                          label: "Fase Gold",
+                                          desc: "1° e 2° per girone",
+                                          color: "bg-amber-100 text-amber-700",
+                                        },
+                                        {
+                                          icon: "🥈",
+                                          label: "Fase Silver",
+                                          desc: "3°+ classificati",
+                                          color: "bg-gray-100 text-gray-600",
+                                        },
+                                      ].map((s) => (
+                                        <div
+                                          key={s.label}
+                                          className={`rounded-2xl p-3 ${s.color}`}
+                                        >
+                                          <div className="text-xl mb-1">
+                                            {s.icon}
+                                          </div>
+                                          <div className="font-bold">{s.label}</div>
+                                          <div className="opacity-70 mt-0.5">
+                                            {s.desc}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* ── FASE 1: GIRONI ── */}
+                                    <div>
+                                      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                                        <div className="flex items-center gap-2">
+                                          <span className="w-6 h-6 bg-slate-700 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                                            1
+                                          </span>
+                                          <h4 className="font-bold text-slate-700">
+                                            Fase a Gironi
+                                          </h4>
+                                        </div>
+                                        <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full">
+                                          🎾 Formula: Solo Andata (1 match per coppia)
+                                        </span>
+                                      </div>
+
+                                      <div
+                                        className={`grid gap-4 ${t.groups.length <= 2
+                                          ? "grid-cols-1 md:grid-cols-2"
+                                          : t.groups.length === 3
+                                            ? "grid-cols-1 md:grid-cols-3"
+                                            : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+                                          }`}
+                                      >
+                                        {t.groups.map((group) => {
+                                          const ranking = groupRanking(t, group._id || group.name);
+                                          const gMatches = group.matches || [];
+                                          const done = gMatches.filter((m) => m.winner).length;
+
+                                          return (
+                                            <div
+                                              key={group._id || group.name}
+                                              className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
+                                            >
+                                              <div className="px-4 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 flex items-center justify-between">
+                                                <span className="font-bold text-white text-sm">
+                                                  {group.name}
+                                                </span>
+                                                <span className="text-xs text-white/60">
+                                                  {done}/{gMatches.length} ✓
+                                                </span>
+                                              </div>
+
+                                              {/* Classifica */}
+                                              <div className="px-3 py-2 border-b border-gray-100 space-y-1">
+                                                {ranking.map((s, idx) => (
+                                                  <div
+                                                    key={s.id}
+                                                    className="flex items-center justify-between text-xs py-1"
+                                                  >
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                      <span
+                                                        className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${idx === 0
+                                                          ? "bg-amber-400 text-white"
+                                                          : idx === 1
+                                                            ? "bg-slate-300 text-slate-700"
+                                                            : "bg-gray-100 text-gray-400"
+                                                          }`}
+                                                      >
+                                                        {idx + 1}
+                                                      </span>
+                                                      {s.couple?.seeded && (
+                                                        <span className="text-amber-500 text-[10px] shrink-0">
+                                                          ⭐
+                                                        </span>
+                                                      )}
+                                                      <span
+                                                        className={`font-semibold truncate ${idx > 1 ? "text-gray-400" : "text-slate-700"}`}
+                                                      >
+                                                        {coupleShortName(s.couple)}
+                                                      </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                                                      <span className="text-green-600 font-bold">
+                                                        {s.wins}V
+                                                      </span>
+                                                      <span className="text-red-400">
+                                                        {s.losses}S
+                                                      </span>
+                                                      <span
+                                                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${idx < 2
+                                                          ? "bg-amber-100 text-amber-700"
+                                                          : "bg-gray-100 text-gray-400"
+                                                          }`}
+                                                      >
+                                                        {idx < 2 ? "Gold" : "Silver"}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+
+                                              {/* Match del girone */}
+                                              <div className="px-3 py-2 space-y-1.5">
+                                                {gMatches.map((m) => {
+                                                  const c1 = t.couples.find(
+                                                    (c) =>
+                                                      c._id?.toString() ===
+                                                      (typeof m.couple1 === "object" ? m.couple1?._id?.toString() : m.couple1?.toString()),
+                                                  );
+                                                  const c2 = t.couples.find(
+                                                    (c) =>
+                                                      c._id?.toString() ===
+                                                      (typeof m.couple2 === "object" ? m.couple2?._id?.toString() : m.couple2?.toString()),
+                                                  );
+                                                  const winnerId = typeof m.winner === "object" ? m.winner?._id?.toString() : m.winner?.toString();
+                                                  return (
+                                                    <div
+                                                      key={m._id}
+                                                      onClick={() => {
+                                                        setScoreModal({
+                                                          matchId: m._id,
+                                                          tournamentId: t._id,
+                                                          c1,
+                                                          c2,
+                                                        });
+                                                        setScoreForm({
+                                                          score: m.score || "",
+                                                          winner: winnerId || "",
+                                                        });
+                                                      }}
+                                                      className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs md:text-sm cursor-pointer transition-all ${winnerId
+                                                        ? "bg-green-50 border border-green-200 hover:bg-green-100"
+                                                        : "bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-300"
+                                                        }`}
+                                                    >
+                                                      <span
+                                                        title={coupleFullName(c1)}
+                                                        className={`flex-1 min-w-0 font-bold truncate ${winnerId === c1?._id?.toString()
+                                                          ? "text-green-700"
+                                                          : "text-slate-800"
+                                                          }`}
+                                                      >
+                                                        {coupleShortName(c1)}
+                                                      </span>
+                                                      <span
+                                                        className={`mx-2 px-2 py-0.5 rounded-full font-extrabold text-[11px] shrink-0 ${m.score
+                                                          ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                                                          : "bg-white text-slate-500 border border-slate-200"
+                                                          }`}
+                                                      >
+                                                        {m.score || "vs"}
+                                                      </span>
+                                                      <span
+                                                        title={coupleFullName(c2)}
+                                                        className={`flex-1 min-w-0 font-bold truncate text-right ${winnerId === c2?._id?.toString()
+                                                          ? "text-green-700"
+                                                          : "text-slate-800"
+                                                          }`}
+                                                      >
+                                                        {coupleShortName(c2)}
+                                                      </span>
+                                                      <span className="ml-2 shrink-0">
+                                                        {winnerId ? "✅" : "✏️"}
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    {/* ── FASE 2: GOLD (Eliminazione Diretta) ── */}
+                                    {t.knockoutGold?.length > 0 && (
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <span className="w-6 h-6 bg-amber-500 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                                            2
+                                          </span>
+                                          <h4 className="font-bold text-slate-700">
+                                            🥇 Fase Gold — Eliminazione Diretta
+                                          </h4>
+                                          <span className="text-xs text-gray-400">
+                                            — 1° e 2° di ogni girone
+                                          </span>
+                                        </div>
+                                        <KnockoutBracketView
+                                          rounds={t.knockoutGold}
+                                          couples={t.couples}
+                                          onMatchClick={(m, c1, c2) => {
+                                            setScoreModal({
+                                              matchId: m._id,
+                                              tournamentId: t._id,
+                                              c1,
+                                              c2,
+                                            });
+                                            setScoreForm({
+                                              score: m.score || "",
+                                              winner:
+                                                typeof m.winner === "object"
+                                                  ? m.winner?._id?.toString()
+                                                  : m.winner?.toString() || "",
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {/* ── FASE 3: SILVER (Eliminazione Diretta) ── */}
+                                    {t.knockoutSilver?.length > 0 && (
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <span className="w-6 h-6 bg-slate-400 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                                            3
+                                          </span>
+                                          <h4 className="font-bold text-slate-700">
+                                            🥈 Fase Silver — Eliminazione Diretta
+                                          </h4>
+                                          <span className="text-xs text-gray-400">
+                                            — 3°+ classificati
+                                          </span>
+                                        </div>
+                                        <KnockoutBracketView
+                                          rounds={t.knockoutSilver}
+                                          couples={t.couples}
+                                          onMatchClick={(m, c1, c2) => {
+                                            setScoreModal({
+                                              matchId: m._id,
+                                              tournamentId: t._id,
+                                              c1,
+                                              c2,
+                                            });
+                                            setScoreForm({
+                                              score: m.score || "",
+                                              winner:
+                                                typeof m.winner === "object"
+                                                  ? m.winner?._id?.toString()
+                                                  : m.winner?.toString() || "",
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* Formato non riconosciuto o non ancora selezionato */}
+                            {!["gironi", "knockout", "gironi_knockout"].includes(t.format) && (
                               <EmptyState
                                 icon="🎲"
                                 title="Tabellone non ancora generato"
-                                sub='Aggiungi le coppie (min. 3) e clicca "Genera tabellone"'
+                                sub='Aggiungi le coppie e clicca "Genera tabellone"'
                               />
-                            ) : (
-                              <div className="space-y-8">
-                                {/* Info box fasi */}
-                                <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                                  {[
-                                    {
-                                      icon: "⬡",
-                                      label: "Fase Gironi",
-                                      desc: "Round-robin",
-                                      color: "bg-slate-100 text-slate-600",
-                                    },
-                                    {
-                                      icon: "🥇",
-                                      label: "Fase Gold",
-                                      desc: "1° e 2° per girone",
-                                      color: "bg-amber-100 text-amber-700",
-                                    },
-                                    {
-                                      icon: "🥈",
-                                      label: "Fase Silver",
-                                      desc: "3° classificato",
-                                      color: "bg-gray-100 text-gray-600",
-                                    },
-                                  ].map((s) => (
-                                    <div
-                                      key={s.label}
-                                      className={`rounded-2xl p-3 ${s.color}`}
-                                    >
-                                      <div className="text-xl mb-1">
-                                        {s.icon}
-                                      </div>
-                                      <div className="font-bold">{s.label}</div>
-                                      <div className="opacity-70 mt-0.5">
-                                        {s.desc}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* ── FASE 1: GIRONI ── */}
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <span className="w-6 h-6 bg-slate-700 text-white rounded-full text-xs flex items-center justify-center font-bold">
-                                      1
-                                    </span>
-                                    <h4 className="font-bold text-slate-700">
-                                      Fase a Gironi
-                                    </h4>
-                                    <span className="text-xs text-gray-400">
-                                      —{" "}
-                                      {
-                                        t.matches.filter(
-                                          (m) =>
-                                            m.phase === "group" && m.winner,
-                                        ).length
-                                      }
-                                      /
-                                      {
-                                        t.matches.filter(
-                                          (m) => m.phase === "group",
-                                        ).length
-                                      }{" "}
-                                      completati
-                                    </span>
-                                  </div>
-
-                                  <div
-                                    className={`grid gap-4 ${t.groups.length <= 2
-                                      ? "grid-cols-1 md:grid-cols-2"
-                                      : t.groups.length === 3
-                                        ? "grid-cols-1 md:grid-cols-3"
-                                        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-                                      }`}
-                                  >
-                                    {t.groups.map((group) => {
-                                      const ranking = groupRanking(
-                                        t,
-                                        group.number,
-                                      );
-                                      const gMatches = t.matches.filter(
-                                        (m) =>
-                                          m.phase === "group" &&
-                                          m.group === group.number,
-                                      );
-                                      const done = gMatches.filter(
-                                        (m) => m.winner,
-                                      ).length;
-
-                                      return (
-                                        <div
-                                          key={group.number}
-                                          className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
-                                        >
-                                          {/* Header girone */}
-                                          <div className="px-4 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 flex items-center justify-between">
-                                            <span className="font-bold text-white text-sm">
-                                              Girone {group.number}
-                                            </span>
-                                            <span className="text-xs text-white/60">
-                                              {done}/{gMatches.length} ✓
-                                            </span>
-                                          </div>
-
-                                          {/* Classifica */}
-                                          <div className="px-3 py-2 border-b border-gray-100 space-y-1">
-                                            {ranking.map((s, idx) => (
-                                              <div
-                                                key={s.id}
-                                                className="flex items-center justify-between text-xs py-1"
-                                              >
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                  <span
-                                                    className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${idx === 0
-                                                      ? "bg-amber-400 text-white"
-                                                      : idx === 1
-                                                        ? "bg-slate-300 text-slate-700"
-                                                        : "bg-gray-100 text-gray-400"
-                                                      }`}
-                                                  >
-                                                    {idx + 1}
-                                                  </span>
-                                                  {s.couple?.seeded && (
-                                                    <span className="text-amber-500 text-[10px] shrink-0">
-                                                      ⭐
-                                                    </span>
-                                                  )}
-                                                  <span
-                                                    className={`font-semibold truncate ${idx > 1 ? "text-gray-400" : "text-slate-700"}`}
-                                                  >
-                                                    {coupleShortName(s.couple)}
-                                                  </span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                                                  <span className="text-green-600 font-bold">
-                                                    {s.wins}V
-                                                  </span>
-                                                  <span className="text-red-400">
-                                                    {s.losses}S
-                                                  </span>
-                                                  <span
-                                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${idx < 2
-                                                      ? "bg-amber-100 text-amber-700"
-                                                      : "bg-gray-100 text-gray-400"
-                                                      }`}
-                                                  >
-                                                    {idx < 2
-                                                      ? "Gold"
-                                                      : "Silver"}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-
-                                          {/* Match del girone */}
-                                          <div className="px-3 py-2 space-y-1.5">
-                                            {gMatches.map((m) => {
-                                              const c1 = t.couples.find(
-                                                (c) =>
-                                                  c._id?.toString() ===
-                                                  m.couple1?.toString(),
-                                              );
-                                              const c2 = t.couples.find(
-                                                (c) =>
-                                                  c._id?.toString() ===
-                                                  m.couple2?.toString(),
-                                              );
-                                              return (
-                                                <div
-                                                  key={m._id}
-                                                  onClick={() => {
-                                                    setScoreModal({
-                                                      matchId: m._id,
-                                                      tournamentId: t._id,
-                                                      c1,
-                                                      c2,
-                                                    });
-                                                    setScoreForm({
-                                                      score: m.score || "",
-                                                      winner:
-                                                        m.winner?.toString() ||
-                                                        "",
-                                                    });
-                                                  }}
-                                                  className={`flex items-center justify-between rounded-xl px-2.5 py-2 text-xs cursor-pointer transition-all ${m.winner
-                                                    ? "bg-green-50 border border-green-100 hover:bg-green-100"
-                                                    : "bg-gray-50 border border-gray-100 hover:bg-blue-50 hover:border-blue-200"
-                                                    }`}
-                                                >
-                                                  <span
-                                                    className={`font-bold truncate max-w-[60px] ${m.winner?.toString() ===
-                                                      c1?._id?.toString()
-                                                      ? "text-green-700"
-                                                      : "text-gray-600"
-                                                      }`}
-                                                  >
-                                                    {coupleShortName(c1)}
-                                                  </span>
-                                                  <span
-                                                    className={`mx-1 px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${m.score
-                                                      ? "bg-yellow-100 text-yellow-700"
-                                                      : "bg-gray-100 text-gray-400"
-                                                      }`}
-                                                  >
-                                                    {m.score || "vs"}
-                                                  </span>
-                                                  <span
-                                                    className={`font-bold truncate max-w-[60px] text-right ${m.winner?.toString() ===
-                                                      c2?._id?.toString()
-                                                      ? "text-green-700"
-                                                      : "text-gray-600"
-                                                      }`}
-                                                  >
-                                                    {coupleShortName(c2)}
-                                                  </span>
-                                                  <span className="ml-1 shrink-0">
-                                                    {m.winner ? "✅" : "✏️"}
-                                                  </span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* ── FASE 2: GOLD ── */}
-                                <BracketSection
-                                  phase="gold"
-                                  matches={t.matches.filter(
-                                    (m) => m.phase === "gold",
-                                  )}
-                                  couples={t.couples}
-                                  onMatchClick={(m, c1, c2) => {
-                                    setScoreModal({
-                                      matchId: m._id,
-                                      tournamentId: t._id,
-                                      c1,
-                                      c2,
-                                    });
-                                    setScoreForm({
-                                      score: m.score || "",
-                                      winner: m.winner?.toString() || "",
-                                    });
-                                  }}
-                                />
-
-                                {/* ── FASE 3: SILVER ── */}
-                                <BracketSection
-                                  phase="silver"
-                                  matches={t.matches.filter(
-                                    (m) => m.phase === "silver",
-                                  )}
-                                  couples={t.couples}
-                                  onMatchClick={(m, c1, c2) => {
-                                    setScoreModal({
-                                      matchId: m._id,
-                                      tournamentId: t._id,
-                                      c1,
-                                      c2,
-                                    });
-                                    setScoreForm({
-                                      score: m.score || "",
-                                      winner: m.winner?.toString() || "",
-                                    });
-                                  }}
-                                />
-                              </div>
                             )}
                           </div>
                         )}

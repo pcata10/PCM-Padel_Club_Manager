@@ -1,14 +1,12 @@
-{"name":"Campo 2","type":"indoor","order":2,"status":"available","_id":"9hUfqPVvzZhFfU3t"}
-{"name":"Campo 3","type":"indoor","order":3,"status":"available","_id":"GFOeIrl8jI1AdGdi"}
-{"name":"Campo 4 Esterno","type":"outdoor","order":4,"status":"available","_id":"Svazkvvw4Lty1nmo"}
-{"name":"Campo 1","type":"indoor","order":1,"status":"available","_id":"fMHaKO4z5yrRbUTI"}
-{"name":"Campo 5 Esterno","type":"outdoor","order":5,"status":"available","_id":"jLY3H46BNgtNCUFZ"}
-{"$$deleted":true,"_id":"9hUfqPVvzZhFfU3t"}
-{"$$deleted":true,"_id":"GFOeIrl8jI1AdGdi"}
-{"$$deleted":true,"_id":"Svazkvvw4Lty1nmo"}
-{"$$deleted":true,"_id":"fMHaKO4z5yrRbUTI"}
-{"$$deleted":true,"_id":"jLY3H46BNgtNCUFZ"}
-{"name":"Campo 1","type":"indoor","order":1,"status":"available","_id":"BkQA9IJxnpPxMJtw"}
-{"name":"Campo 2","type":"indoor","order":2,"status":"available","_id":"8aL420QPEyHPLyGA"}
-{"name":"Campo 3","type":"indoor","order":3,"status":"available","_id":"BZGdGTvJkV61HJV6"}
-{"name":"Campo 4","type":"indoor","order":4,"status":"available","_id":"IcJmiVBKWoRlfEry"}
+{"name":"Campo 2","type":"indoor","order":2,"status":"available","_id":"SGBDcVNjg6d73nxR"}
+{"name":"Campo 3","type":"indoor","order":3,"status":"available","_id":"Z9jrxWA5tjCLqxce"}
+{"name":"Campo 4","type":"indoor","order":4,"status":"available","_id":"fNwIEZsV941vIjs8"}
+{"name":"Campo 1","type":"indoor","order":1,"status":"available","_id":"uTzXB71wRkfOckCU"}
+{"$$deleted":true,"_id":"SGBDcVNjg6d73nxR"}
+{"$$deleted":true,"_id":"Z9jrxWA5tjCLqxce"}
+{"$$deleted":true,"_id":"fNwIEZsV941vIjs8"}
+{"$$deleted":true,"_id":"uTzXB71wRkfOckCU"}
+{"name":"Campo 1","type":"indoor","order":1,"status":"available","_id":"B4JJcnLeFfenc7Z1"}
+{"name":"Campo 2","type":"indoor","order":2,"status":"available","_id":"XM1uyfQWtKMUNLbR"}
+{"name":"Campo 3","type":"indoor","order":3,"status":"available","_id":"jj9IJBqG73Zfaga0"}
+{"name":"Campo 4","type":"indoor","order":4,"status":"available","_id":"fTVdrK5Zte2T2ncU"}

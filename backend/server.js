@@ -97,6 +97,27 @@ async function populateTournament(t) {
     })),
   }));
 
+  // Populate knockoutGold & knockoutSilver for gironi_knockout format
+  const knockoutGold = (t.knockoutGold || []).map((r) => ({
+    ...r,
+    matches: (r.matches || []).map((m) => ({
+      ...m,
+      couple1: m.couple1 ? (coupleMap[m.couple1] || m.couple1) : null,
+      couple2: m.couple2 ? (coupleMap[m.couple2] || m.couple2) : null,
+      winner: m.winner ? (coupleMap[m.winner] || m.winner) : null,
+    })),
+  }));
+
+  const knockoutSilver = (t.knockoutSilver || []).map((r) => ({
+    ...r,
+    matches: (r.matches || []).map((m) => ({
+      ...m,
+      couple1: m.couple1 ? (coupleMap[m.couple1] || m.couple1) : null,
+      couple2: m.couple2 ? (coupleMap[m.couple2] || m.couple2) : null,
+      winner: m.winner ? (coupleMap[m.winner] || m.winner) : null,
+    })),
+  }));
+
   // Strip passwords from players
   const safePlayers = players.map(({ password: _pw, ...p }) => p);
 
@@ -107,6 +128,8 @@ async function populateTournament(t) {
     couples,
     groups,
     knockoutRounds,
+    knockoutGold,
+    knockoutSilver,
     format: t.format || "gironi",
   };
 }
@@ -213,10 +236,73 @@ app.post("/api/login", async (req, res) => {
     const player = await db.players.findOneAsync({ email: email.trim().toLowerCase() });
     if (!player || !(await bcrypt.compare(password, player.password)))
       return res.status(400).json({ msg: "Credenziali errate" });
+
+    // Verifica se è richiesto il cambio password al primo login (flag o password di default ancora attiva)
+    const isDefaultAdmin = player.role === "admin" && (await bcrypt.compare("admin123", player.password));
+    const mustChangePassword = Boolean(player.mustChangePassword || isDefaultAdmin);
+
     const token = jwt.sign({ id: player._id, role: player.role }, JWT_SECRET);
-    res.json({ token, player: { id: player._id, email: player.email, name: player.name, level: player.level, role: player.role } });
+    res.json({
+      token,
+      mustChangePassword,
+      player: {
+        id: player._id,
+        email: player.email,
+        name: player.name,
+        level: player.level,
+        role: player.role,
+        mustChangePassword,
+      },
+    });
   } catch (err) {
     res.status(500).json({ msg: "Errore login", error: err.message });
+  }
+});
+
+app.post("/api/change-password", auth, async (req, res) => {
+  try {
+    const { newPassword, currentPassword } = req.body;
+    if (!newPassword || newPassword.trim().length < 6) {
+      return res.status(400).json({ msg: "La nuova password deve contenere almeno 6 caratteri" });
+    }
+
+    if (newPassword.trim() === "admin123") {
+      return res.status(400).json({ msg: "Scegli una password diversa da quella predefinita (admin123)" });
+    }
+
+    const player = await db.players.findOneAsync({ _id: req.user.id });
+    if (!player) return res.status(404).json({ msg: "Utente non trovato" });
+
+    // Se fornita la password attuale, verificala (facoltativa per il primo cambio forzato)
+    if (currentPassword && !(await bcrypt.compare(currentPassword, player.password))) {
+      return res.status(400).json({ msg: "Password attuale non corretta" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword.trim(), 10);
+    await db.players.updateAsync(
+      { _id: player._id },
+      {
+        $set: {
+          password: hashed,
+          mustChangePassword: false,
+          passwordChangedAt: new Date().toISOString(),
+        },
+      }
+    );
+
+    res.json({
+      success: true,
+      msg: "Password aggiornata con successo!",
+      player: {
+        id: player._id,
+        email: player.email,
+        name: player.name,
+        role: player.role,
+        mustChangePassword: false,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Errore cambio password", error: err.message });
   }
 });
 
@@ -342,6 +428,28 @@ app.post("/api/admin/players/bulk", auth, adminOnly, async (req, res) => {
 });
 
 // ── TOURNAMENTS ──────────────────────────────────────────────────
+
+// Public read-only endpoints (no auth required, spectator/clubhouse TV)
+app.get("/api/public/tournaments", async (_req, res) => {
+  try {
+    const tournaments = await db.tournaments.findAsync({});
+    tournaments.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const populated = await Promise.all(tournaments.map(populateTournament));
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ msg: "Errore caricamento tornei pubblici", error: err.message });
+  }
+});
+
+app.get("/api/public/tournaments/:id", async (req, res) => {
+  try {
+    const t = await db.tournaments.findOneAsync({ _id: req.params.id });
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+    res.json(await populateTournament(t));
+  } catch (err) {
+    res.status(500).json({ msg: "Errore caricamento torneo", error: err.message });
+  }
+});
 
 app.get("/api/tournaments", auth, async (_req, res) => {
   try {
@@ -673,7 +781,21 @@ function getRoundName(totalRounds, r) {
   return `Turno ${r + 1}`;
 }
 
-function generateKnockoutBracket(couples) {
+function getMatchSeedOrder(numMatches) {
+  let order = [0];
+  while (order.length < numMatches) {
+    const nextOrder = [];
+    const currentLen = order.length * 2;
+    for (let i = 0; i < order.length; i++) {
+      nextOrder.push(order[i]);
+      nextOrder.push(currentLen - 1 - order[i]);
+    }
+    order = nextOrder;
+  }
+  return order;
+}
+
+function generateKnockoutBracket(couples, preserveOrder = false) {
   const n = couples.length;
   if (n < 2) return [];
 
@@ -682,13 +804,31 @@ function generateKnockoutBracket(couples) {
     bracketSize *= 2;
   }
 
-  const seeded = couples.filter((c) => c.seeded);
-  const unseeded = shuffle(couples.filter((c) => !c.seeded));
-  const ordered = [...seeded, ...unseeded];
+  let ordered;
+  if (preserveOrder) {
+    ordered = [...couples];
+  } else {
+    const seeded = couples.filter((c) => c.seeded);
+    const unseeded = shuffle(couples.filter((c) => !c.seeded));
+    ordered = [...seeded, ...unseeded];
+  }
+
+  const numMatches = bracketSize / 2;
+  const numByes = bracketSize - n;
+  const seedOrder = getMatchSeedOrder(numMatches);
+  const byeMatches = new Set(seedOrder.slice(0, numByes));
 
   const slots = new Array(bracketSize).fill(null);
-  for (let i = 0; i < ordered.length; i++) {
-    slots[i] = ordered[i]._id;
+  let teamIdx = 0;
+
+  for (let m = 0; m < numMatches; m++) {
+    if (byeMatches.has(m)) {
+      slots[m * 2] = ordered[teamIdx++]?._id || null;
+      slots[m * 2 + 1] = null; // BYE
+    } else {
+      slots[m * 2] = ordered[teamIdx++]?._id || null;
+      slots[m * 2 + 1] = ordered[teamIdx++]?._id || null;
+    }
   }
 
   const totalRounds = Math.log2(bracketSize);
@@ -703,6 +843,7 @@ function generateKnockoutBracket(couples) {
       let couple1 = null;
       let couple2 = null;
       let winner = null;
+      let score = "";
 
       if (r === 0) {
         couple1 = slots[m * 2] || null;
@@ -710,8 +851,10 @@ function generateKnockoutBracket(couples) {
 
         if (couple1 && !couple2) {
           winner = couple1;
+          score = "BYE";
         } else if (!couple1 && couple2) {
           winner = couple2;
+          score = "BYE";
         }
       }
 
@@ -721,7 +864,7 @@ function generateKnockoutBracket(couples) {
         matchIndex: m,
         couple1,
         couple2,
-        score: "",
+        score,
         winner,
       });
     }
@@ -760,6 +903,7 @@ app.post("/api/tournaments/:id/draw", auth, adminOnly, async (req, res) => {
     const format = req.body.format || t.format || "gironi";
 
     if (format === "knockout") {
+      // ── ELIMINAZIONE DIRETTA PURA ──
       if (couples.length < 2)
         return res.status(400).json({ msg: "Servono almeno 2 coppie per l'eliminazione diretta" });
 
@@ -776,8 +920,68 @@ app.post("/api/tournaments/:id/draw", auth, adminOnly, async (req, res) => {
           },
         }
       );
+    } else if (format === "gironi_knockout") {
+      // ── GIRONI + ELIMINAZIONE DIRETTA (Gold & Silver) ──
+      if (couples.length < 4)
+        return res.status(400).json({ msg: "Servono almeno 4 coppie per gironi + eliminazione diretta" });
+
+      // Sort: seeded first, then shuffle the rest
+      const seeded = couples.filter((c) => c.seeded);
+      const unseeded = shuffle(couples.filter((c) => !c.seeded));
+      const ordered = [...seeded, ...unseeded];
+
+      // Determine group count: aim for groups of 3-4 couples
+      const n = ordered.length;
+      let groupCount = Math.max(2, Math.floor(n / 4));
+      if (n <= 4) groupCount = 2;
+      if (n === 5 || n === 6) groupCount = 2;
+
+      // Distribute couples into groups (snake draft)
+      const groups = Array.from({ length: groupCount }, (_, i) => ({
+        _id: `g_${i + 1}`,
+        name: `Girone ${String.fromCharCode(65 + i)}`,
+        couples: [],
+        matches: [],
+      }));
+
+      ordered.forEach((c, idx) => {
+        const g = idx % groupCount;
+        groups[g].couples.push(c._id);
+      });
+
+      // Generate round-robin matches for each group
+      for (const g of groups) {
+        const gc = g.couples;
+        g.matches = [];
+        for (let i = 0; i < gc.length; i++) {
+          for (let j = i + 1; j < gc.length; j++) {
+            g.matches.push({
+              _id: `m_${g._id}_${i}_${j}_${Date.now()}`,
+              couple1: gc[i],
+              couple2: gc[j],
+              score: "",
+              winner: null,
+            });
+          }
+        }
+      }
+
+      await db.tournaments.updateAsync(
+        { _id: req.params.id },
+        {
+          $set: {
+            format: "gironi_knockout",
+            groups,
+            knockoutGold: [],
+            knockoutSilver: [],
+            knockoutRounds: [],
+            status: "running",
+            matches: [],
+          },
+        }
+      );
     } else {
-      // Formato Gironi
+      // ── GIRONI PURI (solo fase a gironi, senza eliminazione diretta) ──
       if (couples.length < 3)
         return res.status(400).json({ msg: "Servono almeno 3 coppie per i gironi" });
 
@@ -829,6 +1033,8 @@ app.post("/api/tournaments/:id/draw", auth, adminOnly, async (req, res) => {
             format: "gironi",
             groups,
             knockoutRounds: [],
+            knockoutGold: [],
+            knockoutSilver: [],
             status: "running",
             matches: [],
           },
@@ -840,6 +1046,105 @@ app.post("/api/tournaments/:id/draw", auth, adminOnly, async (req, res) => {
     res.json(await populateTournament(updated));
   } catch (err) {
     res.status(500).json({ msg: "Errore generazione tabellone", error: err.message });
+  }
+});
+
+// ── TOURNAMENT — GENERATE KNOCKOUT FROM GROUPS (Gold & Silver) ──
+// Generates Gold & Silver brackets based on group rankings with cross-pairing
+app.post("/api/tournaments/:id/generate-knockout", auth, adminOnly, async (req, res) => {
+  try {
+    const t = await db.tournaments.findOneAsync({ _id: req.params.id });
+    if (!t) return res.status(404).json({ msg: "Torneo non trovato" });
+
+    const groups = t.groups || [];
+    if (!groups.length) {
+      return res.status(400).json({ msg: "Nessun girone presente. Genera prima la fase a gironi." });
+    }
+    const allCouples = t.couples || [];
+
+    // Calcola la classifica per ogni girone (Vittorie desc, Sconfitte asc)
+    const groupRankings = groups.map((g) => {
+      const stats = {};
+      (g.couples || []).forEach((cId) => {
+        const id = typeof cId === "object" ? cId._id?.toString() : cId?.toString();
+        if (id) stats[id] = { id, wins: 0, losses: 0, played: 0 };
+      });
+
+      (g.matches || []).filter((m) => m && m.winner).forEach((m) => {
+        const w = typeof m.winner === "object" ? m.winner._id?.toString() : m.winner?.toString();
+        const c1 = typeof m.couple1 === "object" ? m.couple1._id?.toString() : m.couple1?.toString();
+        const c2 = typeof m.couple2 === "object" ? m.couple2._id?.toString() : m.couple2?.toString();
+        const l = c1 === w ? c2 : c1;
+        if (stats[w]) { stats[w].wins++; stats[w].played++; }
+        if (stats[l]) { stats[l].losses++; stats[l].played++; }
+      });
+
+      const ranked = Object.values(stats).sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
+      return ranked.map((r) => r.id);
+    });
+
+    // Incroci Gold (1° e 2° di ogni girone) e Silver (3° e successivi)
+    let goldCoupleIds = [];
+    let silverCoupleIds = [];
+
+    if (groupRankings.length === 2) {
+      const gA = groupRankings[0];
+      const gB = groupRankings[1];
+      // Gold: Semifinale 1 (1°A vs 2°B), Semifinale 2 (1°B vs 2°A)
+      if (gA[0]) goldCoupleIds.push(gA[0]);
+      if (gB[1]) goldCoupleIds.push(gB[1]);
+      if (gB[0]) goldCoupleIds.push(gB[0]);
+      if (gA[1]) goldCoupleIds.push(gA[1]);
+
+      // Silver: incroci per 3°, 4°, 5°...
+      const maxLen = Math.max(gA.length, gB.length);
+      for (let i = 2; i < maxLen; i += 2) {
+        if (gA[i]) silverCoupleIds.push(gA[i]);
+        if (gB[i + 1]) silverCoupleIds.push(gB[i + 1]);
+        if (gB[i]) silverCoupleIds.push(gB[i]);
+        if (gA[i + 1]) silverCoupleIds.push(gA[i + 1]);
+      }
+      gA.slice(2).concat(gB.slice(2)).forEach((id) => {
+        if (!silverCoupleIds.includes(id)) silverCoupleIds.push(id);
+      });
+    } else {
+      // Più di 2 gironi: 1° e 2° vanno al Gold con incrocio ciclico
+      const firsts = [];
+      const seconds = [];
+      groupRankings.forEach((ranked) => {
+        if (ranked[0]) firsts.push(ranked[0]);
+        if (ranked[1]) seconds.push(ranked[1]);
+        ranked.slice(2).forEach((id) => silverCoupleIds.push(id));
+      });
+      const nG = firsts.length;
+      for (let i = 0; i < nG; i++) {
+        goldCoupleIds.push(firsts[i]);
+        if (seconds[(i + 1) % nG]) goldCoupleIds.push(seconds[(i + 1) % nG]);
+      }
+    }
+
+    const findCouple = (id) => allCouples.find((c) => (c._id?.toString() || c._id) === id?.toString());
+    const goldCouplesData = goldCoupleIds.map(findCouple).filter(Boolean);
+    const silverCouplesData = silverCoupleIds.map(findCouple).filter(Boolean);
+
+    const knockoutGold = goldCouplesData.length >= 2 ? generateKnockoutBracket(goldCouplesData, true) : [];
+    const knockoutSilver = silverCouplesData.length >= 2 ? generateKnockoutBracket(silverCouplesData, true) : [];
+
+    await db.tournaments.updateAsync(
+      { _id: req.params.id },
+      {
+        $set: {
+          format: "gironi_knockout",
+          knockoutGold,
+          knockoutSilver,
+        },
+      }
+    );
+
+    const updated = await db.tournaments.findOneAsync({ _id: req.params.id });
+    res.json(await populateTournament(updated));
+  } catch (err) {
+    res.status(500).json({ msg: "Errore generazione fase eliminazione diretta", error: err.message });
   }
 });
 
@@ -864,9 +1169,50 @@ app.put("/api/tournaments/:id/matches/:matchId", auth, adminOnly, async (req, re
       const matches = (r.matches || []).map((m, mIdx) => {
         if (m._id === req.params.matchId) {
           const updated = { ...m, score, winner };
-          // Se c'è un vincitore e c'è un turno successivo, avanza la coppia vincente!
           if (winner && rIdx + 1 < knockoutRounds.length) {
             const nextRound = knockoutRounds[rIdx + 1];
+            const nextMatchIdx = Math.floor(mIdx / 2);
+            const slot = mIdx % 2 === 0 ? "couple1" : "couple2";
+            if (nextRound && nextRound.matches && nextRound.matches[nextMatchIdx]) {
+              nextRound.matches[nextMatchIdx][slot] = winner;
+            }
+          }
+          return updated;
+        }
+        return m;
+      });
+      return { ...r, matches };
+    });
+
+    // 2b. Update match inside knockoutGold (gironi_knockout format)
+    let knockoutGold = t.knockoutGold || [];
+    knockoutGold = knockoutGold.map((r, rIdx) => {
+      const matches = (r.matches || []).map((m, mIdx) => {
+        if (m._id === req.params.matchId) {
+          const updated = { ...m, score, winner };
+          if (winner && rIdx + 1 < knockoutGold.length) {
+            const nextRound = knockoutGold[rIdx + 1];
+            const nextMatchIdx = Math.floor(mIdx / 2);
+            const slot = mIdx % 2 === 0 ? "couple1" : "couple2";
+            if (nextRound && nextRound.matches && nextRound.matches[nextMatchIdx]) {
+              nextRound.matches[nextMatchIdx][slot] = winner;
+            }
+          }
+          return updated;
+        }
+        return m;
+      });
+      return { ...r, matches };
+    });
+
+    // 2c. Update match inside knockoutSilver (gironi_knockout format)
+    let knockoutSilver = t.knockoutSilver || [];
+    knockoutSilver = knockoutSilver.map((r, rIdx) => {
+      const matches = (r.matches || []).map((m, mIdx) => {
+        if (m._id === req.params.matchId) {
+          const updated = { ...m, score, winner };
+          if (winner && rIdx + 1 < knockoutSilver.length) {
+            const nextRound = knockoutSilver[rIdx + 1];
             const nextMatchIdx = Math.floor(mIdx / 2);
             const slot = mIdx % 2 === 0 ? "couple1" : "couple2";
             if (nextRound && nextRound.matches && nextRound.matches[nextMatchIdx]) {
@@ -887,7 +1233,7 @@ app.put("/api/tournaments/:id/matches/:matchId", auth, adminOnly, async (req, re
 
     await db.tournaments.updateAsync(
       { _id: req.params.id },
-      { $set: { groups, knockoutRounds, matches } }
+      { $set: { groups, knockoutRounds, knockoutGold, knockoutSilver, matches } }
     );
 
     const updated = await db.tournaments.findOneAsync({ _id: req.params.id });

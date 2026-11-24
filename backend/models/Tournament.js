@@ -49,6 +49,11 @@ const tournamentSchema = new mongoose.Schema(
       enum: ["open", "principiante", "intermedio", "avanzato", "agonista"],
       default: "open",
     },
+    format: {
+      type: String,
+      enum: ["gironi", "knockout", "gironi_knockout"],
+      default: "gironi",
+    },
     status: {
       type: String,
       enum: ["open", "running", "finished"],

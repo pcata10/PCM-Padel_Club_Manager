@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
 import AdminTournaments from "./pages/AdminTournaments";
+import PublicTournament from "./pages/PublicTournament.jsx";
 import "./index.css";
 
 // ── Booking-related pages are commented out in this edition ──────
@@ -24,6 +25,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/"                  element={<App />} />
         <Route path="/login"             element={<Login />} />
         <Route path="/admin/tournaments" element={<AdminTournaments />} />
+        
+        {/* Public Read-Only / Spectator / Clubhouse TV Routes */}
+        <Route path="/live"              element={<PublicTournament />} />
+        <Route path="/public"            element={<PublicTournament />} />
+        <Route path="/tournament/:id"    element={<PublicTournament />} />
+        <Route path="/tournaments/:id"   element={<PublicTournament />} />
 
         {/* Redirect all old routes to the tournament page */}
         <Route path="/admin"      element={<Navigate to="/admin/tournaments" replace />} />

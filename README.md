@@ -14,6 +14,7 @@
 </p>
 
 <p align="center">
+  <a href="ISTRUZIONI.md"><strong>📖 GUIDA &amp; ISTRUZIONI COMPLETE PER CHIAVETTA USB (CLICCA QUI)</strong></a><br/><br/>
   <a href="#-features">Features</a> •
   <a href="#-screenshots">Screenshots</a> •
   <a href="#%EF%B8%8F-tech-stack">Tech Stack</a> •

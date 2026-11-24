@@ -10,6 +10,12 @@ cd "$(dirname "$0")"
 echo "🎾 Starting Padel Tournament Manager..."
 echo ""
 
+if ! command -v node &> /dev/null; then
+  echo "❌ Node.js non trovato su questo computer!"
+  echo "Per eseguire l'app è necessario installare Node.js (gratuito) da: https://nodejs.org"
+  exit 1
+fi
+
 # Install backend deps if needed
 if [ ! -d "backend/node_modules" ]; then
   echo "📦 Installing backend dependencies..."
